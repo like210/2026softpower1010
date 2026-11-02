@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>게릴라 야~호! 부스 안내 시스템</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body {
+            font-family: 'Pretendard', sans-serif;
+            user-select: none;
+        }
+
+        /* Canvas / Map View Container */
+        .map-container {
+            position: relative;
+            overflow: hidden;
+            background-color: #f8fafc;
+            touch-action: none;
+        }
+
+        /* Marker Styles */
+        .marker {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            transition: transform 0.15s ease, filter 0.15s ease;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .marker:hover {
+            transform: translate(-50%, -108%) scale(1.1);
+            z-index: 30;
+        }
+
+        .marker.current-location {
+            transform: translate(-50%, -100%);
+            z-index: 25;
+        }
+
+        /* Ripple effect for current location */
+        .pulse-ring {
+            position: absolute;
+            top: 75%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px;
+            height: 36px;
+            background-color: rgba(239, 68, 68, 0.4);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2.2);
+                opacity: 0;
+            }
+        }
+
+        /* Tooltip style */
+        .marker-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            pointer-events: none;
+            margin-bottom: 6px;
+        }
+
+        /* Grid lines overlay for setup mode */
+        .grid-overlay {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(203, 213, 225, 0.3) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(203, 213, 225, 0.3) 1px, transparent 1px);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-800 text-white border-b border-slate-700 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 z-40">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-r from-amber-500 to-rose-500 p-2 rounded-xl text-white shadow-md">
+                <i class="fa-solid font-bold fa-map-location-dot text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight tracking-tight text-white flex items-center gap-2">
+                    게릴라 야~호! 부스 안내 📍
+                    <span id="mode-badge" class="text-xs px-2 py-0.5 rounded-full bg-indigo-600 text-indigo-100 font-medium">안내 모드</span>
+                </h1>
+                <p class="text-xs text-slate-400 hidden sm:block">실시간 부스 위치 확인 및 3일간 통합 관리 시스템</p>
+            </div>
+        </div>
+
+        <!-- DAY SELECTOR & CONTROL HEADER -->
+        <div class="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-700">
+            <button onclick="switchDay(1)" id="day-btn-1" class="day-tab px-3 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm">
+                <i class="fa-regular fa-calendar-check text-xs"></i> 1일차
+            </button>
+            <button onclick="switchDay(2)" id="day-btn-2" class="day-tab px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+                <i class="fa-regular fa-calendar text-xs"></i> 2일차
+            </button>
+            <button onclick="switchDay(3)" id="day-btn-3" class="day-tab px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+                <i class="fa-regular fa-calendar text-xs"></i> 3일차
+            </button>
+        </div>
+
+        <!-- Control Actions -->
+        <div class="flex items-center gap-2">
+            <button onclick="toggleMode()" id="mode-toggle-btn" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm transition-all flex items-center gap-2 shadow-lg hover:shadow-amber-500/20 active:scale-95">
+                <i class="fa-solid fa-gear"></i>
+                <span id="mode-btn-text">부스 위치 및 팀 설정</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Left Admin Drawer (Overlaid Slide-out, hidden in View Mode) -->
+        <aside id="admin-sidebar" class="w-80 bg-slate-800 border-r border-slate-700 flex flex-col h-full transition-all duration-300 transform -translate-x-full absolute left-0 top-0 bottom-0 z-30 shadow-2xl hidden">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-850">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-amber-400"></i>
+                    <h2 class="font-bold text-slate-100 text-sm">
+                        <span id="sidebar-day-title">1일차</span> 부스 명단 관리
+                    </h2>
+                </div>
+                <button onclick="addNewBoothFromSidebar()" class="text-xs text-amber-300 hover:text-amber-200 font-bold px-2.5 py-1 rounded bg-amber-500/20 border border-amber-500/40 transition">
+                    + 부스 추가
+                </button>
+            </div>
+
+            <!-- Quick Import Textarea -->
+            <div class="p-3 border-b border-slate-700/60 bg-slate-900/40">
+                <label class="block text-xs font-medium text-slate-400 mb-1">
+                    팀명 목록 일괄등록 <span class="text-slate-500">(줄바꿈 구분)</span>
+                </label>
+                <div class="flex gap-1.5">
+                    <textarea id="bulk-input" rows="2" placeholder="팀명 1&#10;팀명 2&#10;팀명 3..." class="w-full text-xs p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-500 resize-none"></textarea>
+                    <button onclick="applyBulkTeams()" class="px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shrink-0 transition">
+                        적용
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-2 text-xs bg-amber-950/40 text-amber-300 border-b border-amber-900/30 flex items-center gap-1.5 px-3">
+                <i class="fa-solid fa-circle-info text-amber-400"></i>
+                <span>지도의 원하는 위치를 직접 클릭하여 마킹을 생성 및 등록하세요!</span>
+            </div>
+
+            <!-- Team List & Position Status -->
+            <div class="flex-1 overflow-y-auto p-3 space-y-2.5" id="team-list-container">
+                <!-- Team items dynamically populated here -->
+            </div>
+
+            <div class="p-3 border-t border-slate-700 bg-slate-850 flex justify-between items-center text-xs text-slate-400">
+                <span>등록된 부스: <strong id="placed-count" class="text-amber-400">0</strong>개</span>
+                <button onclick="toggleMode()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition">
+                    설정 완료 & Save
+                </button>
+            </div>
+        </aside>
+
+        <!-- Map Workspace (Takes full width in guidance mode) -->
+        <main class="w-full h-full relative bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
+            
+            <!-- Floating Zoom & Map Controls -->
+            <div class="absolute top-4 right-4 z-20 flex flex-col gap-2 bg-slate-800/90 backdrop-blur border border-slate-700 p-1.5 rounded-xl shadow-xl">
+                <button onclick="zoomIn()" class="w-8 h-8 flex items-center justify-center text-slate-200 hover:bg-slate-700 rounded-lg transition" title="확대">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+                <button onclick="zoomOut()" class="w-8 h-8 flex items-center justify-center text-slate-200 hover:bg-slate-700 rounded-lg transition" title="축소">
+                    <i class="fa-solid fa-minus"></i>
+                </button>
+                <button onclick="resetZoom()" class="w-8 h-8 flex items-center justify-center text-slate-200 hover:bg-slate-700 rounded-lg transition" title="화면 맞춤">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+            </div>
+
+            <!-- Interactive Map Viewport -->
+            <div id="map-viewport" class="w-full h-full relative cursor-grab active:cursor-grabbing overflow-hidden flex items-center justify-center">
+                <div id="map-wrapper" class="relative inline-block transition-transform duration-75 origin-center shadow-2xl">
+                    
+                    <!-- Base Canvas Image -->
+                    <svg id="base-svg-map" class="w-full h-auto max-h-[85vh] rounded-xl shadow-2xl select-none block" viewBox="0 0 1000 700" style="min-width: 600px; background: #ffffff;">
+                        <!-- SVG Map Layout matching event map artwork -->
+                        <rect width="1000" height="700" fill="#FFFFFF"/>
+                        
+                        <!-- Top Banner / Title Header Artwork -->
+                        <text x="500" y="45" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="700" font-size="20" fill="#1e293b">게릴라 야~호! 부스 야~호!</text>
+                        <text x="500" y="85" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="900" font-size="34" fill="#09090b">너의 도전에 응원 스티커 전송 완료 💖</text>
+                        
+                        <!-- Top TV Display Ribbon Line -->
+                        <rect x="90" y="140" width="820" height="28" fill="#bfdbfe" rx="4"/>
+                        <!-- Top TVs -->
+                        <g transform="translate(100, 125)">
+                            <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
+                            <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <line x1="35" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <circle cx="43" cy="14" r="2.5" fill="#1e293b"/>
+                            <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
+                        </g>
+                        <g transform="translate(360, 125)">
+                            <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
+                            <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <line x1="35" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <circle cx="43" cy="14" r="2.5" fill="#1e293b"/>
+                            <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
+                        </g>
+                        <g transform="translate(620, 125)">
+                            <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
+                            <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <line x1="35" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <circle cx="43" cy="14" r="2.5" fill="#1e293b"/>
+                            <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
+                        </g>
+                        <g transform="translate(880, 125)">
+                            <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
+                            <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <line x1="35" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <circle cx="43" cy="14" r="2.5" fill="#1e293b"/>
+                            <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
+                        </g>
+
+                        <!-- Curving Booth Area Shapes -->
+                        <path d="M 200,430 A 130,130 0 1,0 140,580" fill="none" stroke="#38bdf8" stroke-width="46" stroke-linecap="round"/>
+                        <path d="M 300,410 A 110,110 0 0,1 500,420" fill="none" stroke="#fbbf24" stroke-width="42" stroke-linecap="round"/>
+                        <path d="M 490,420 A 90,90 0 0,1 660,430" fill="none" stroke="#fbbf24" stroke-width="38" stroke-linecap="round"/>
+                        <path d="M 800,420 A 130,130 0 1,1 860,580" fill="none" stroke="#38bdf8" stroke-width="46" stroke-linecap="round"/>
+                        <path d="M 320,590 A 90,90 0 0,0 480,590" fill="none" stroke="#78350f" stroke-width="38" stroke-linecap="round"/>
+
+                        <!-- Decorative Labels -->
+                        <text x="135" y="495" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#0369a1" text-anchor="middle">A 존</text>
+                        <text x="400" y="340" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#b45309" text-anchor="middle">B 존</text>
+                        <text x="580" y="360" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#b45309" text-anchor="middle">C 존</text>
+                        <text x="880" y="495" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#0369a1" text-anchor="middle">D 존</text>
+                        <text x="400" y="655" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#451a03" text-anchor="middle">E 존</text>
+                    </svg>
+
+                    <!-- Interactive Pin Overlay Container -->
+                    <div id="pins-layer" class="absolute inset-0 w-full h-full pointer-events-auto">
+                        <!-- Pins generated dynamically -->
+                    </div>
+
+                    <!-- Setup Grid Overlay -->
+                    <div id="grid-overlay" class="absolute inset-0 grid-overlay pointer-events-none hidden opacity-60"></div>
+                </div>
+            </div>
+
+            <!-- Setup Placement Floating Status Bar -->
+            <div id="placement-toolbar" class="absolute bottom-6 bg-slate-800/95 text-white border border-slate-700 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 z-30 transition-all transform translate-y-24 opacity-0 pointer-events-none">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-amber-400 animate-ping"></span>
+                    <span class="text-sm font-medium">선택된 부스: <strong id="selected-booth-name" class="text-amber-400 font-bold">팀을 선택하세요</strong></span>
+                </div>
+                <button onclick="clearSelectedPlacement()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-200 transition">
+                    선택 취소
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: Direct Click Add/Edit Booth Marker -->
+    <div id="booth-edit-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl transform scale-95 transition-transform duration-200" id="booth-edit-card">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold rounded-lg flex items-center gap-1">
+                        <i class="fa-solid fa-location-dot"></i> 마킹 및 부스명 기록
+                    </span>
+                </div>
+                <button onclick="closeBoothEditModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveBoothFromModal(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">부스/팀 이름</label>
+                    <input type="text" id="modal-edit-name" required placeholder="예: 스마트 로봇 체험관" class="w-full text-sm p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">부스 설명 (선택)</label>
+                    <textarea id="modal-edit-desc" rows="2" placeholder="체험 내용이나 운영 시간 등 작성..." class="w-full text-xs p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-500 resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">마커 색상 설정</label>
+                    <div class="flex gap-2">
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="pin-color" value="amber" checked class="peer hidden" />
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-amber-400 peer-checked:bg-amber-500 peer-checked:text-slate-950 font-bold transition">주황 (기본)</div>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="pin-color" value="emerald" class="peer hidden" />
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-emerald-400 peer-checked:bg-emerald-500 peer-checked:text-slate-950 font-bold transition">초록 (체험)</div>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="pin-color" value="indigo" class="peer hidden" />
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-indigo-400 peer-checked:bg-indigo-500 peer-checked:text-white font-bold transition">보라 (이벤트)</div>
+                        </label>
+                    </div>
+                </div>
+
+                <input type="hidden" id="modal-edit-x" />
+                <input type="hidden" id="modal-edit-y" />
+                <input type="hidden" id="modal-edit-id" />
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" onclick="deleteBoothFromModal()" id="modal-delete-btn" class="px-3 py-2.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-xs font-bold rounded-xl transition">
+                        삭제
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-sm font-bold transition shadow-lg shadow-amber-500/20">
+                        기록 저장하기
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Booth Details View Mode -->
+    <div id="booth-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl transform scale-95 transition-transform duration-200" id="booth-modal-card">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-2">
+                    <span id="modal-booth-badge" class="px-2.5 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold rounded-lg">
+                        부스 #1
+                    </span>
+                    <span id="modal-day-badge" class="px-2 py-1 bg-slate-700 text-slate-300 text-xs font-medium rounded-lg">
+                        1일차
+                    </span>
+                </div>
+                <button onclick="closeBoothModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <h3 id="modal-team-name" class="text-xl font-bold text-white mb-2">팀 이름이 표기됩니다</h3>
+            <p id="modal-desc" class="text-slate-300 text-sm mb-6 leading-relaxed">
+                현재 일자에 해당하는 부스 운영팀입니다. 현장에서 진행되는 다양한 체험 및 게릴라 이벤트에 참여해 보세요!
+            </p>
+
+            <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 flex items-center justify-between text-xs text-slate-400 mb-5">
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-rose-400"></i> 위치 지정 완료</span>
+                <span class="text-emerald-400 font-medium">운영 중 <i class="fa-solid fa-circle text-[8px] animate-pulse"></i></span>
+            </div>
+
+            <button onclick="closeBoothModal()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-600/30">
+                확인
+            </button>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // State Management
+        let currentDay = 1;
+        let isSetupMode = false;
+        let activeSelectedBoothId = null;
+
+        // Default Data for 3 Days
+        const initialDaysData = {
+            1: [
+                { id: 'b1_1', name: '스마트 로봇 체험팀', desc: '다양한 인공지능 자율주행 로봇 체험존', color: 'amber', x: 18, y: 55 },
+                { id: 'b1_2', name: '드론 자율주행 연구소', desc: '실내 레이싱 드론 조정 및 자율주행 시연', color: 'indigo', x: 14, y: 72 },
+                { id: 'b1_3', name: '3D 프린팅 스튜디오', desc: '나만의 나비 키링 만들기 DIY 3D 프린터', color: 'amber', x: 26, y: 78 },
+                { id: 'b1_4', name: 'AI 화가 및 초상화', desc: '생성형 AI로 그리는 캐리커처 팝아트', color: 'emerald', x: 33, y: 52 },
+                { id: 'b1_5', name: '메타버스 VR 체험관', desc: '가상현실 어드벤처 롤러코스터 체험', color: 'amber', x: 40, y: 56 },
+                { id: 'b1_6', name: '친환경 캡슐 공방', desc: '플라스틱 재활용 업사이클링 액세서리', color: 'emerald', x: 47, y: 54 },
+                { id: 'b1_7', name: '게릴라 야호 퀴즈존', desc: '선착순 응원 스티커 이벤트 및 상품 증정', color: 'indigo', x: 54, y: 56 },
+                { id: 'b1_8', name: '스마트 헬스케어', desc: '체성분 측정 및 디지털 건강 진단', color: 'amber', x: 62, y: 58 },
+                { id: 'b1_9', name: '코딩 아카데미 메이커', desc: '아두이노 피지컬 코딩 교실', color: 'amber', x: 81, y: 54 },
+                { id: 'b1_10', name: '자율주행 모빌리티', desc: '전기 전동 휠 체험 및 안전 가이드', color: 'emerald', x: 86, y: 72 },
+                { id: 'b1_11', name: '창의 과학 실험실', desc: '신기한 액체질소 공룡알 만들기', color: 'amber', x: 78, y: 78 },
+                { id: 'b1_12', name: '청소년 밴드 동아리', desc: '신나는 야외 록 밴드 라이브 공연', color: 'indigo', x: 37, y: 82 },
+                { id: 'b1_13', name: '응원 스티커 전송 부스', desc: '도전자들을 향한 따뜻한 응원 메시지 기부', color: 'amber', x: 45, y: 82 }
+            ],
+            2: [
+                { id: 'b2_1', name: '우주 항공 탐사대', desc: '누리호 로켓 모형 제작 체험', color: 'amber', x: 18, y: 55 },
+                { id: 'b2_2', name: '사이버 보안 챌린지', desc: '화이트 해커의 해킹 방어 미션 해결', color: 'indigo', x: 14, y: 72 },
+                { id: 'b2_3', name: 'IoT 스마트홈 시스템', desc: '음성인식으로 조작하는 스마트 가전', color: 'emerald', x: 26, y: 78 },
+                { id: 'b2_4', name: '빅데이터 운세 코너', desc: '사주와 알고리즘이 결합한 미래 운세', color: 'amber', x: 33, y: 52 },
+                { id: 'b2_5', name: '자연 에너지 체험관', desc: '태양광 자동차 경주 대결', color: 'amber', x: 40, y: 56 },
+                { id: 'b2_6', name: '업사이클링 굿즈샵', desc: '버려지는 폐현수막 가방 제작', color: 'emerald', x: 47, y: 54 },
+                { id: 'b2_7', name: '야호! 게임 토너먼트', desc: '모바일 e스포츠 토너먼트 대회', color: 'indigo', x: 54, y: 56 },
+                { id: 'b2_8', name: '미래 식량 바이오', desc: '식물성 대체육 햄버거 시식회', color: 'amber', x: 62, y: 58 },
+                { id: 'b2_9', name: '디지털 캘리그라피', desc: '아이패드로 작성하는 커스텀 문구', color: 'amber', x: 81, y: 54 },
+                { id: 'b2_10', name: '홀로그램 포토존', desc: '입체 3D 3D 홀로그램 기념사진 촬영', color: 'amber', x: 86, y: 72 },
+                { id: 'b2_11', name: '로봇 파이팅 배틀', desc: '배틀로봇 상호 격투 대회', color: 'indigo', x: 78, y: 78 },
+                { id: 'b2_12', name: '버스킹 공연 무대', desc: '어쿠스틱 듀오 감성 노래 무대', color: 'amber', x: 37, y: 82 },
+                { id: 'b2_13', name: '스티커 수집 본부', desc: '모든 스티커 모으고 뽑기 도전!', color: 'emerald', x: 45, y: 82 }
+            ],
+            3: [
+                { id: 'b3_1', name: '미래 로봇 수술실', desc: '의료용 수술 로봇의 정밀 원격 조종', color: 'amber', x: 18, y: 55 },
+                { id: 'b3_2', name: '도심 항공 UAM 체험', desc: '플라잉 카 조종 시뮬레이터', color: 'indigo', x: 14, y: 72 },
+                { id: 'b3_3', name: '블록체인 인증 센터', desc: '나만의 참가 NFT 즉시 발급하기', color: 'emerald', x: 26, y: 78 },
+                { id: 'b3_4', name: '생성형 AI 웹툰', desc: '키워드로 완성하는 4컷 툰 만들기', color: 'amber', x: 33, y: 52 },
+                { id: 'b3_5', name: '스마트 팜 농장', desc: '수경재배 스마트 키트 분양', color: 'emerald', x: 40, y: 56 },
+                { id: 'b3_6', name: '지구 살리기 챌린지', desc: '탄소중립 에코 퀴즈 및 선물', color: 'amber', x: 47, y: 54 },
+                { id: 'b3_7', name: '야호! 최종 시상식', desc: '우수 참여팀 메달 상장 수여식', color: 'indigo', x: 54, y: 56 },
+                { id: 'b3_8', name: '양자 컴퓨터 퀴즈', desc: '양자역학 알고리즘 퀴즈 미션', color: 'amber', x: 62, y: 58 },
+                { id: 'b3_9', name: '메이커스 플리마켓', desc: '청소년 크리에이터 수제 굿즈 판매', color: 'amber', x: 81, y: 54 },
+                { id: 'b3_10', name: 'VR 패러글라이딩', desc: '바람 느끼는 체감형 VR 시뮬레이션', color: 'amber', x: 86, y: 72 },
+                { id: 'b3_11', name: '알고리즘 방탈출', desc: '암호를 풀어 탈출하는 10분 미션', color: 'indigo', x: 78, y: 78 },
+                { id: 'b3_12', name: '폐막 축하 공연팀', desc: '화려한 댄스 퍼포먼스 및 마무리 무대', color: 'amber', x: 37, y: 82 },
+                { id: 'b3_13', name: '스티커 전송 리워드', desc: '최종 응원 스티커 집계 선물 교환', color: 'emerald', x: 45, y: 82 }
+            ]
+        };
+
+        // Shared Current Location Pin Coordinates (%)
+        let currentLocationPin = { x: 50, y: 22 };
+
+        // Main App State
+        let appData = {
+            days: JSON.parse(JSON.stringify(initialDaysData)),
+            currentLocation: { ...currentLocationPin }
+        };
+
+        function loadData() {
+            const saved = localStorage.getItem('booth_app_data_v2');
+            if (saved) {
+                try {
+                    appData = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to parse saved booth data', e);
+                }
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('booth_app_data_v2', JSON.stringify(appData));
+            renderSidebar();
+            renderPins();
+        }
+
+        window.addEventListener('load', () => {
+            loadData();
+            switchDay(1);
+            resetZoom();
+            lucide.createIcons();
+        });
+
+        function switchDay(day) {
+            currentDay = day;
+            activeSelectedBoothId = null;
+            updatePlacementToolbar();
+
+            for (let i = 1; i <= 3; i++) {
+                const btn = document.getElementById(`day-btn-${i}`);
+                if (i === day) {
+                    btn.className = "day-tab px-3 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm";
+                } else {
+                    btn.className = "day-tab px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white transition-all flex items-center gap-1.5";
+                }
+            }
+
+            document.getElementById('sidebar-day-title').innerText = `${day}일차`;
+            renderSidebar();
+            renderPins();
+        }
+
+        function toggleMode() {
+            isSetupMode = !isSetupMode;
+            activeSelectedBoothId = null;
+
+            const modeBadge = document.getElementById('mode-badge');
+            const modeBtnText = document.getElementById('mode-btn-text');
+            const sidebar = document.getElementById('admin-sidebar');
+            const gridOverlay = document.getElementById('grid-overlay');
+
+            if (isSetupMode) {
+                modeBadge.className = "text-xs px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-bold";
+                modeBadge.innerText = "관리자 설정 모드";
+                modeBtnText.innerText = "안내 모드로 변경";
+                sidebar.classList.remove('hidden', '-translate-x-full');
+                sidebar.classList.add('translate-x-0');
+                gridOverlay.classList.remove('hidden');
+            } else {
+                modeBadge.className = "text-xs px-2 py-0.5 rounded-full bg-indigo-600 text-indigo-100 font-medium";
+                modeBadge.innerText = "안내 모드";
+                modeBtnText.innerText = "부스 위치 및 팀 설정";
+                sidebar.classList.remove('translate-x-0');
+                sidebar.classList.add('-translate-x-full', 'hidden');
+                gridOverlay.classList.add('hidden');
+            }
+
+            updatePlacementToolbar();
+            renderPins();
+            renderSidebar();
+        }
+
+        function renderSidebar() {
+            const container = document.getElementById('team-list-container');
+            container.innerHTML = '';
+            const teams = appData.days[currentDay] || [];
+
+            let placedCount = 0;
+
+            // Current Location Pin Settings Item
+            const curLocItem = document.createElement('div');
+            curLocItem.className = `p-2.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                activeSelectedBoothId === 'CURRENT_LOCATION' 
+                ? 'bg-rose-950/60 border-rose-500 ring-2 ring-rose-500/30' 
+                : 'bg-slate-900 border-slate-700/80 hover:border-slate-600'
+            }`;
+            curLocItem.onclick = () => selectBoothForPlacement('CURRENT_LOCATION');
+            curLocItem.innerHTML = `
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                    <span class="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 font-bold text-xs shadow-md">
+                        📍
+                    </span>
+                    <div class="truncate">
+                        <div class="text-xs font-bold text-rose-300">현재 위치 핀</div>
+                        <div class="text-[10px] text-slate-400 truncate">선택 후 지도를 클릭하여 이동</div>
+                    </div>
+                </div>
+                <span class="text-[10px] px-2 py-0.5 bg-rose-900/50 text-rose-300 rounded font-medium border border-rose-700/50">
+                    공통
+                </span>
+            `;
+            container.appendChild(curLocItem);
+
+            const divider = document.createElement('div');
+            divider.className = "text-[11px] font-semibold text-slate-400 pt-2 pb-1 px-1 flex justify-between items-center";
+            divider.innerHTML = `<span>등록된 부스 (${teams.length}개)</span> <span class="text-[10px] text-amber-400 font-normal">클릭하여 정보 편집</span>`;
+            container.appendChild(divider);
+
+            teams.forEach((team, index) => {
+                if (team.x !== null && team.y !== null) placedCount++;
+
+                const isSelected = activeSelectedBoothId === team.id;
+                const item = document.createElement('div');
+                item.className = `p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
+                    isSelected 
+                    ? 'bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/30' 
+                    : team.x !== null 
+                        ? 'bg-slate-900 border-slate-700 hover:border-slate-600' 
+                        : 'bg-slate-900/40 border-slate-800 opacity-75'
+                }`;
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onclick="openBoothEditModal('${team.id}')">
+                        <span class="w-6 h-6 rounded-lg ${getBgColorByColorName(team.color)} text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
+                            ${index + 1}
+                        </span>
+                        <div class="flex flex-col truncate">
+                            <span class="text-xs text-slate-100 font-bold truncate">${escapeHtml(team.name)}</span>
+                            <span class="text-[10px] text-slate-400 truncate">${escapeHtml(team.desc || '설명 없음')}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="openBoothEditModal('${team.id}')" title="편집" class="text-slate-400 hover:text-amber-300 text-xs p-1">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        ${team.x !== null ? `
+                            <button onclick="removeBoothPosition('${team.id}')" title="위치 해제" class="text-slate-400 hover:text-rose-400 text-xs p-1">
+                                <i class="fa-solid fa-location-slash"></i>
+                            </button>
+                        ` : `
+                            <span class="text-[10px] text-slate-500 px-1.5 py-0.5 border border-slate-800 rounded">미배치</span>
+                        `}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+
+            document.getElementById('placed-count').innerText = placedCount;
+        }
+
+        function getBgColorByColorName(color) {
+            switch(color) {
+                case 'emerald': return 'bg-emerald-400';
+                case 'indigo': return 'bg-indigo-400 text-white';
+                default: return 'bg-amber-400';
+            }
+        }
+
+        function addNewBoothFromSidebar() {
+            const teams = appData.days[currentDay] || [];
+            const newId = `b${currentDay}_${Date.now()}`;
+            teams.push({
+                id: newId,
+                name: `신규 부스 #${teams.length + 1}`,
+                desc: '부스 설명 및 안내 문구',
+                color: 'amber',
+                x: null,
+                y: null
+            });
+            saveData();
+            openBoothEditModal(newId);
+        }
+
+        function applyBulkTeams() {
+            const textarea = document.getElementById('bulk-input');
+            const lines = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            
+            if (lines.length === 0) return;
+
+            const currentTeams = appData.days[currentDay] || [];
+            
+            lines.forEach((line, idx) => {
+                if (idx < currentTeams.length) {
+                    currentTeams[idx].name = line;
+                } else {
+                    currentTeams.push({
+                        id: `b${currentDay}_${Date.now()}_${idx}`,
+                        name: line,
+                        desc: '현장 운영 부스',
+                        color: 'amber',
+                        x: null,
+                        y: null
+                    });
+                }
+            });
+
+            textarea.value = '';
+            saveData();
+        }
+
+        function selectBoothForPlacement(boothId) {
+            if (!isSetupMode) return;
+            activeSelectedBoothId = (activeSelectedBoothId === boothId) ? null : boothId;
+            updatePlacementToolbar();
+            renderSidebar();
+        }
+
+        function clearSelectedPlacement() {
+            activeSelectedBoothId = null;
+            updatePlacementToolbar();
+            renderSidebar();
+        }
+
+        function updatePlacementToolbar() {
+            const toolbar = document.getElementById('placement-toolbar');
+            const nameEl = document.getElementById('selected-booth-name');
+
+            if (isSetupMode && activeSelectedBoothId) {
+                toolbar.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+                if (activeSelectedBoothId === 'CURRENT_LOCATION') {
+                    nameEl.innerText = "📍 현재 위치 핀 (이동 대기 중)";
+                } else {
+                    const team = appData.days[currentDay].find(t => t.id === activeSelectedBoothId);
+                    nameEl.innerText = team ? `${team.name} (위치 재지정)` : "선택됨";
+                }
+            } else {
+                toolbar.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function removeBoothPosition(boothId) {
+            const team = appData.days[currentDay].find(t => t.id === boothId);
+            if (team) {
+                team.x = null;
+                team.y = null;
+                saveData();
+            }
+        }
+
+        function renderPins() {
+            const container = document.getElementById('pins-layer');
+            container.innerHTML = '';
+
+            // 1. Current Location Pin
+            const curLoc = appData.currentLocation || currentLocationPin;
+            const curPin = document.createElement('div');
+            curPin.className = 'marker current-location flex flex-col items-center';
+            curPin.style.left = `${curLoc.x}%`;
+            curPin.style.top = `${curLoc.y}%`;
+
+            curPin.innerHTML = `
+                <div class="relative flex items-center justify-center">
+                    <div class="pulse-ring"></div>
+                    <img src="https://maps.google.com/mapfiles/ms/icons/red-dot.png" class="w-9 h-9 drop-shadow-lg filter hover:brightness-110 transition" alt="현재위치">
+                </div>
+                <div class="mt-0.5 bg-rose-600 text-white font-extrabold text-[11px] px-2 py-0.5 rounded-full shadow-lg border border-white flex items-center gap-1">
+                    <i class="fa-solid fa-location-crosshairs text-[10px]"></i> 현재위치
+                </div>
+            `;
+            
+            if (isSetupMode) {
+                makeElementDraggable(curPin, (newX, newY) => {
+                    appData.currentLocation = { x: newX, y: newY };
+                    saveData();
+                });
+            }
+
+            container.appendChild(curPin);
+
+            // 2. Booth Pins
+            const teams = appData.days[currentDay] || [];
+
+            teams.forEach((team, index) => {
+                if (team.x === null || team.y === null) return;
+
+                const pin = document.createElement('div');
+                const isSelected = activeSelectedBoothId === team.id;
+                const pinBg = getBgColorByColorName(team.color);
+
+                pin.className = `marker flex flex-col items-center group ${isSelected ? 'z-40 scale-110' : ''}`;
+                pin.style.left = `${team.x}%`;
+                pin.style.top = `${team.y}%`;
+
+                pin.innerHTML = `
+                    <div class="marker-tooltip opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-xl border border-slate-700">
+                        ${escapeHtml(team.name)}
+                    </div>
+                    <div class="w-8 h-8 rounded-full ${pinBg} font-black text-xs flex items-center justify-center border-2 border-white shadow-xl group-hover:scale-110 transition-transform">
+                        ${index + 1}
+                    </div>
+                    <div class="mt-1 bg-slate-900/90 backdrop-blur text-slate-100 text-[11px] font-bold px-2 py-0.5 rounded-md shadow-md border border-slate-700/80 max-w-[120px] truncate text-center">
+                        ${escapeHtml(team.name)}
+                    </div>
+                `;
+
+                pin.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isSetupMode) {
+                        openBoothEditModal(team.id);
+                    } else {
+                        openBoothModal(team, index + 1);
+                    }
+                };
+
+                if (isSetupMode) {
+                    makeElementDraggable(pin, (newX, newY) => {
+                        team.x = newX;
+                        team.y = newY;
+                        saveData();
+                    });
+                }
+
+                container.appendChild(pin);
+            });
+        }
+
+        // Map Click Event: Direct Click Location & Record Booth Info
+        const mapWrapper = document.getElementById('map-wrapper');
+        mapWrapper.addEventListener('click', (e) => {
+            if (!isSetupMode) return;
+
+            const rect = mapWrapper.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            const xPercent = Math.round((clickX / rect.width) * 10000) / 100;
+            const yPercent = Math.round((clickY / rect.height) * 10000) / 100;
+
+            if (activeSelectedBoothId === 'CURRENT_LOCATION') {
+                appData.currentLocation = { x: xPercent, y: yPercent };
+                activeSelectedBoothId = null;
+                saveData();
+                updatePlacementToolbar();
+            } else if (activeSelectedBoothId) {
+                // If existing booth selected to move position
+                const team = appData.days[currentDay].find(t => t.id === activeSelectedBoothId);
+                if (team) {
+                    team.x = xPercent;
+                    team.y = yPercent;
+                }
+                activeSelectedBoothId = null;
+                saveData();
+                updatePlacementToolbar();
+            } else {
+                // Open Direct Modal to Create New Booth Pin with Name & Description
+                openBoothEditModal(null, xPercent, yPercent);
+            }
+        });
+
+        // Open Modal to Add/Edit Booth
+        function openBoothEditModal(boothId = null, x = null, y = null) {
+            const modal = document.getElementById('booth-edit-modal');
+            const card = document.getElementById('booth-edit-card');
+            const nameInput = document.getElementById('modal-edit-name');
+            const descInput = document.getElementById('modal-edit-desc');
+            const deleteBtn = document.getElementById('modal-delete-btn');
+
+            document.getElementById('modal-edit-id').value = boothId || '';
+            document.getElementById('modal-edit-x').value = x !== null ? x : '';
+            document.getElementById('modal-edit-y').value = y !== null ? y : '';
+
+            if (boothId) {
+                const team = appData.days[currentDay].find(t => t.id === boothId);
+                if (team) {
+                    nameInput.value = team.name;
+                    descInput.value = team.desc || '';
+                    const radio = document.querySelector(`input[name="pin-color"][value="${team.color || 'amber'}"]`);
+                    if (radio) radio.checked = true;
+                }
+                deleteBtn.classList.remove('hidden');
+            } else {
+                const count = (appData.days[currentDay] || []).length + 1;
+                nameInput.value = `부스 ${count}`;
+                descInput.value = '';
+                document.querySelector('input[name="pin-color"][value="amber"]').checked = true;
+                deleteBtn.classList.add('hidden');
+            }
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            card.classList.remove('scale-95');
+            card.classList.add('scale-100');
+            setTimeout(() => nameInput.focus(), 100);
+        }
+
+        function closeBoothEditModal() {
+            const modal = document.getElementById('booth-edit-modal');
+            const card = document.getElementById('booth-edit-card');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            card.classList.remove('scale-100');
+            card.classList.add('scale-95');
+        }
+
+        function saveBoothFromModal(e) {
+            e.preventDefault();
+            const boothId = document.getElementById('modal-edit-id').value;
+            const x = document.getElementById('modal-edit-x').value;
+            const y = document.getElementById('modal-edit-y').value;
+            const name = document.getElementById('modal-edit-name').value;
+            const desc = document.getElementById('modal-edit-desc').value;
+            const color = document.querySelector('input[name="pin-color"]:checked').value;
+
+            const teams = appData.days[currentDay];
+
+            if (boothId) {
+                const team = teams.find(t => t.id === boothId);
+                if (team) {
+                    team.name = name;
+                    team.desc = desc;
+                    team.color = color;
+                }
+            } else {
+                teams.push({
+                    id: `b${currentDay}_${Date.now()}`,
+                    name: name,
+                    desc: desc,
+                    color: color,
+                    x: parseFloat(x),
+                    y: parseFloat(y)
+                });
+            }
+
+            closeBoothEditModal();
+            saveData();
+        }
+
+        function deleteBoothFromModal() {
+            const boothId = document.getElementById('modal-edit-id').value;
+            if (!boothId) return;
+
+            if (confirm('해당 부스를 마킹과 명단에서 삭제하시겠습니까?')) {
+                appData.days[currentDay] = appData.days[currentDay].filter(t => t.id !== boothId);
+                closeBoothEditModal();
+                saveData();
+            }
+        }
+
+        function makeElementDraggable(elmnt, onDragEnd) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            elmnt.onmousedown = dragMouseDown;
+            elmnt.ontouchstart = dragMouseDown;
+
+            function dragMouseDown(e) {
+                if (!isSetupMode) return;
+                e.stopPropagation();
+                
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                pos3 = clientX;
+                pos4 = clientY;
+
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+                document.ontouchend = closeDragElement;
+                document.ontouchmove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e.preventDefault();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                pos1 = pos3 - clientX;
+                pos2 = pos4 - clientY;
+                pos3 = clientX;
+                pos4 = clientY;
+
+                const parentRect = mapWrapper.getBoundingClientRect();
+                let newLeft = elmnt.offsetLeft - pos1;
+                let newTop = elmnt.offsetTop - pos2;
+
+                let xPct = Math.min(Math.max((newLeft / parentRect.width) * 100, 2), 98);
+                let yPct = Math.min(Math.max((newTop / parentRect.height) * 100, 2), 98);
+
+                elmnt.style.left = xPct + "%";
+                elmnt.style.top = yPct + "%";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+                document.ontouchend = null;
+                document.ontouchmove = null;
+
+                const xPct = parseFloat(elmnt.style.left);
+                const yPct = parseFloat(elmnt.style.top);
+                onDragEnd(Math.round(xPct * 100) / 100, Math.round(yPct * 100) / 100);
+            }
+        }
+
+        // Zoom & Pan Controller Logic
+        let zoomLevel = 1;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let startX, startY;
+
+        const viewport = document.getElementById('map-viewport');
+        const wrapper = document.getElementById('map-wrapper');
+
+        function updateTransform() {
+            wrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+        }
+
+        function zoomIn() {
+            zoomLevel = Math.min(zoomLevel + 0.2, 2.5);
+            updateTransform();
+        }
+
+        function zoomOut() {
+            zoomLevel = Math.max(zoomLevel - 0.2, 0.7);
+            updateTransform();
+        }
+
+        function resetZoom() {
+            zoomLevel = 1;
+            panX = 0;
+            panY = 0;
+            updateTransform();
+        }
+
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.marker')) return;
+            isPanning = true;
+            startX = e.clientX - panX;
+            startY = e.clientY - panY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            panX = e.clientX - startX;
+            panY = e.clientY - startY;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            isPanning = false;
+        });
+
+        viewport.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1 && !e.target.closest('.marker')) {
+                isPanning = true;
+                startX = e.touches[0].clientX - panX;
+                startY = e.touches[0].clientY - panY;
+            }
+        });
+
+        viewport.addEventListener('touchmove', (e) => {
+            if (isPanning && e.touches.length === 1) {
+                panX = e.touches[0].clientX - startX;
+                panY = e.touches[0].clientY - startY;
+                updateTransform();
+            }
+        });
+
+        viewport.addEventListener('touchend', () => {
+            isPanning = false;
+        });
+
+        // Modal Display Functions
+        function openBoothModal(team, index) {
+            document.getElementById('modal-booth-badge').innerText = `부스 #${index}`;
+            document.getElementById('modal-day-badge').innerText = `${currentDay}일차`;
+            document.getElementById('modal-team-name').innerText = team.name;
+            document.getElementById('modal-desc').innerText = team.desc || '현재 일자에 해당하는 부스 운영팀입니다. 현장에서 진행되는 다양한 체험에 참여해 보세요!';
+
+            const modal = document.getElementById('booth-modal');
+            const card = document.getElementById('booth-modal-card');
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            card.classList.remove('scale-95');
+            card.classList.add('scale-100');
+        }
+
+        function closeBoothModal() {
+            const modal = document.getElementById('booth-modal');
+            const card = document.getElementById('booth-modal-card');
+
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            card.classList.remove('scale-100');
+            card.classList.add('scale-95');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
