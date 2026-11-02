@@ -69,15 +69,45 @@
             }
         }
 
-        /* Tooltip style */
-        .marker-tooltip {
+        /* Speech Bubble Popup Style */
+        .speech-bubble {
             position: absolute;
-            bottom: 100%;
+            bottom: 110%;
             left: 50%;
             transform: translateX(-50%);
-            white-space: nowrap;
-            pointer-events: none;
-            margin-bottom: 6px;
+            background-color: #0f172a;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 10px 14px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            white-space: normal;
+            width: 180px;
+            z-index: 50;
+            animation: bubbleFadeIn 0.2s ease-out;
+        }
+
+        /* Speech Bubble Tail */
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 7px;
+            border-style: solid;
+            border-color: #0f172a transparent transparent transparent;
+        }
+
+        @keyframes bubbleFadeIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, 8px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
         }
 
         /* Grid lines overlay for setup mode */
@@ -92,7 +122,7 @@
 <body class="bg-slate-900 text-slate-800 h-screen flex flex-col overflow-hidden">
 
     <!-- Header Navigation -->
-    <header class="bg-slate-800 text-white border-b border-slate-700 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 z-40">
+    <header class="bg-slate-800 text-white border-b border-slate-700 px-4 py-3 flex items-center justify-between gap-3 shrink-0 z-40">
         <div class="flex items-center space-x-3">
             <div class="bg-gradient-to-r from-amber-500 to-rose-500 p-2 rounded-xl text-white shadow-md">
                 <i class="fa-solid font-bold fa-map-location-dot text-xl"></i>
@@ -104,19 +134,6 @@
                 </h1>
                 <p class="text-xs text-slate-400 hidden sm:block">실시간 부스 위치 확인 및 3일간 통합 관리 시스템</p>
             </div>
-        </div>
-
-        <!-- DAY SELECTOR & CONTROL HEADER -->
-        <div class="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-700">
-            <button onclick="switchDay(1)" id="day-btn-1" class="day-tab px-3 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm">
-                <i class="fa-regular fa-calendar-check text-xs"></i> 1일차
-            </button>
-            <button onclick="switchDay(2)" id="day-btn-2" class="day-tab px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
-                <i class="fa-regular fa-calendar text-xs"></i> 2일차
-            </button>
-            <button onclick="switchDay(3)" id="day-btn-3" class="day-tab px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
-                <i class="fa-regular fa-calendar text-xs"></i> 3일차
-            </button>
         </div>
 
         <!-- Control Actions -->
@@ -131,8 +148,26 @@
     <!-- Main Content Area -->
     <div class="flex-1 flex overflow-hidden relative">
 
-        <!-- Left Admin Drawer (Overlaid Slide-out, hidden in View Mode) -->
+        <!-- Left Admin Drawer (Settings Mode Only) -->
         <aside id="admin-sidebar" class="w-80 bg-slate-800 border-r border-slate-700 flex flex-col h-full transition-all duration-300 transform -translate-x-full absolute left-0 top-0 bottom-0 z-30 shadow-2xl hidden">
+            
+            <!-- DAY SELECTOR INSIDE SETTINGS -->
+            <div class="p-3 bg-slate-900 border-b border-slate-700 flex flex-col gap-1.5">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">운영 일차 선택</span>
+                <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 justify-between">
+                    <button onclick="switchDay(1)" id="day-btn-1" class="day-tab flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 bg-indigo-600 text-white shadow-sm">
+                        <i class="fa-regular fa-calendar-check text-xs"></i> 1일차
+                    </button>
+                    <button onclick="switchDay(2)" id="day-btn-2" class="day-tab flex-1 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1">
+                        <i class="fa-regular fa-calendar text-xs"></i> 2일차
+                    </button>
+                    <button onclick="switchDay(3)" id="day-btn-3" class="day-tab flex-1 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1">
+                        <i class="fa-regular fa-calendar text-xs"></i> 3일차
+                    </button>
+                </div>
+            </div>
+
+            <!-- Header of Sidebar -->
             <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-850">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-list-check text-amber-400"></i>
@@ -176,8 +211,8 @@
             </div>
         </aside>
 
-        <!-- Map Workspace (Takes full width in guidance mode) -->
-        <main class="w-full h-full relative bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
+        <!-- Map Workspace -->
+        <main class="w-full h-full relative bg-slate-950 flex flex-col items-center justify-center overflow-hidden" onclick="closeActiveBubble()">
             
             <!-- Floating Zoom & Map Controls -->
             <div class="absolute top-4 right-4 z-20 flex flex-col gap-2 bg-slate-800/90 backdrop-blur border border-slate-700 p-1.5 rounded-xl shadow-xl">
@@ -275,7 +310,7 @@
         </main>
     </div>
 
-    <!-- Modal: Direct Click Add/Edit Booth Marker -->
+    <!-- Modal: Direct Click Add/Edit Booth Marker (Setup Mode Only) -->
     <div id="booth-edit-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
         <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl transform scale-95 transition-transform duration-200" id="booth-edit-card">
             <div class="flex justify-between items-start mb-4">
@@ -295,8 +330,8 @@
                     <input type="text" id="modal-edit-name" required placeholder="예: 스마트 로봇 체험관" class="w-full text-sm p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500" />
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-1">부스 설명 (선택)</label>
-                    <textarea id="modal-edit-desc" rows="2" placeholder="체험 내용이나 운영 시간 등 작성..." class="w-full text-xs p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-500 resize-none"></textarea>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">부스 설명 (운영 내용/명단)</label>
+                    <textarea id="modal-edit-desc" rows="2" placeholder="운영 내용이나 수행 인원 명단 작성..." class="w-full text-xs p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-500 resize-none"></textarea>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">마커 색상 설정</label>
@@ -332,92 +367,58 @@
         </div>
     </div>
 
-    <!-- Modal: Booth Details View Mode -->
-    <div id="booth-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl transform scale-95 transition-transform duration-200" id="booth-modal-card">
-            <div class="flex justify-between items-start mb-4">
-                <div class="flex items-center gap-2">
-                    <span id="modal-booth-badge" class="px-2.5 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold rounded-lg">
-                        부스 #1
-                    </span>
-                    <span id="modal-day-badge" class="px-2 py-1 bg-slate-700 text-slate-300 text-xs font-medium rounded-lg">
-                        1일차
-                    </span>
-                </div>
-                <button onclick="closeBoothModal()" class="text-slate-400 hover:text-white text-lg">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            
-            <h3 id="modal-team-name" class="text-xl font-bold text-white mb-2">팀 이름이 표기됩니다</h3>
-            <p id="modal-desc" class="text-slate-300 text-sm mb-6 leading-relaxed">
-                현재 일자에 해당하는 부스 운영팀입니다. 현장에서 진행되는 다양한 체험 및 게릴라 이벤트에 참여해 보세요!
-            </p>
-
-            <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 flex items-center justify-between text-xs text-slate-400 mb-5">
-                <span class="flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-rose-400"></i> 위치 지정 완료</span>
-                <span class="text-emerald-400 font-medium">운영 중 <i class="fa-solid fa-circle text-[8px] animate-pulse"></i></span>
-            </div>
-
-            <button onclick="closeBoothModal()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-600/30">
-                확인
-            </button>
-        </div>
-    </div>
-
     <!-- Application JavaScript Logic -->
     <script>
         // State Management
         let currentDay = 1;
         let isSetupMode = false;
         let activeSelectedBoothId = null;
+        let openBubbleBoothId = null; // Currently open speech bubble ID in guidance mode
 
-        // Default Data for 3 Days
+        // Default Data for 3 Days (12 booths on Day 1 & 2, 13 booths on Day 3)
         const initialDaysData = {
             1: [
-                { id: 'b1_1', name: '스마트 로봇 체험팀', desc: '다양한 인공지능 자율주행 로봇 체험존', color: 'amber', x: 18, y: 55 },
-                { id: 'b1_2', name: '드론 자율주행 연구소', desc: '실내 레이싱 드론 조정 및 자율주행 시연', color: 'indigo', x: 14, y: 72 },
-                { id: 'b1_3', name: '3D 프린팅 스튜디오', desc: '나만의 나비 키링 만들기 DIY 3D 프린터', color: 'amber', x: 26, y: 78 },
-                { id: 'b1_4', name: 'AI 화가 및 초상화', desc: '생성형 AI로 그리는 캐리커처 팝아트', color: 'emerald', x: 33, y: 52 },
-                { id: 'b1_5', name: '메타버스 VR 체험관', desc: '가상현실 어드벤처 롤러코스터 체험', color: 'amber', x: 40, y: 56 },
-                { id: 'b1_6', name: '친환경 캡슐 공방', desc: '플라스틱 재활용 업사이클링 액세서리', color: 'emerald', x: 47, y: 54 },
-                { id: 'b1_7', name: '게릴라 야호 퀴즈존', desc: '선착순 응원 스티커 이벤트 및 상품 증정', color: 'indigo', x: 54, y: 56 },
-                { id: 'b1_8', name: '스마트 헬스케어', desc: '체성분 측정 및 디지털 건강 진단', color: 'amber', x: 62, y: 58 },
-                { id: 'b1_9', name: '코딩 아카데미 메이커', desc: '아두이노 피지컬 코딩 교실', color: 'amber', x: 81, y: 54 },
-                { id: 'b1_10', name: '자율주행 모빌리티', desc: '전기 전동 휠 체험 및 안전 가이드', color: 'emerald', x: 86, y: 72 },
-                { id: 'b1_11', name: '창의 과학 실험실', desc: '신기한 액체질소 공룡알 만들기', color: 'amber', x: 78, y: 78 },
-                { id: 'b1_12', name: '청소년 밴드 동아리', desc: '신나는 야외 록 밴드 라이브 공연', color: 'indigo', x: 37, y: 82 },
-                { id: 'b1_13', name: '응원 스티커 전송 부스', desc: '도전자들을 향한 따뜻한 응원 메시지 기부', color: 'amber', x: 45, y: 82 }
+                { id: 'b1_1', name: '스마트 로봇 체험팀', desc: '운영자: 김로봇, 이지능\n자율주행 주행 시연존', color: 'amber', x: 18, y: 55 },
+                { id: 'b1_2', name: '드론 자율주행 연구소', desc: '운영자: 박드론\n레이싱 및 안전 교육', color: 'indigo', x: 14, y: 72 },
+                { id: 'b1_3', name: '3D 프린팅 스튜디오', desc: '운영자: 최프린터\n나비 키링 만들기 DIY', color: 'amber', x: 26, y: 78 },
+                { id: 'b1_4', name: 'AI 화가 및 초상화', desc: '운영자: 정화가\nAI 캐리커처 제작', color: 'emerald', x: 33, y: 52 },
+                { id: 'b1_5', name: '메타버스 VR 체험관', desc: '운영자: 강가상\nVR 롤러코스터 체험', color: 'amber', x: 40, y: 56 },
+                { id: 'b1_6', name: '친환경 캡슐 공방', desc: '운영자: 조재활\n업사이클링 악세서리', color: 'emerald', x: 47, y: 54 },
+                { id: 'b1_7', name: '게릴라 야호 퀴즈존', desc: '운영자: 윤퀴즈\n응원 스티커 이벤트', color: 'indigo', x: 54, y: 56 },
+                { id: 'b1_8', name: '스마트 헬스케어', desc: '운영자: 장건강\n체성분 측정 시연', color: 'amber', x: 62, y: 58 },
+                { id: 'b1_9', name: '코딩 아카데미 메이커', desc: '운영자: 임코딩\n아두이노 실습 교실', color: 'amber', x: 81, y: 54 },
+                { id: 'b1_10', name: '자율주행 모빌리티', desc: '운영자: 한휠\n전동 휠 시승 및 가이드', color: 'emerald', x: 86, y: 72 },
+                { id: 'b1_11', name: '창의 과학 실험실', desc: '운영자: 오실험\n액체질소 퍼포먼스', color: 'amber', x: 78, y: 78 },
+                { id: 'b1_12', name: '청소년 밴드 동아리', desc: '운영자: 송라이터\n록 밴드 라이브 공연', color: 'indigo', x: 37, y: 82 }
             ],
             2: [
-                { id: 'b2_1', name: '우주 항공 탐사대', desc: '누리호 로켓 모형 제작 체험', color: 'amber', x: 18, y: 55 },
-                { id: 'b2_2', name: '사이버 보안 챌린지', desc: '화이트 해커의 해킹 방어 미션 해결', color: 'indigo', x: 14, y: 72 },
-                { id: 'b2_3', name: 'IoT 스마트홈 시스템', desc: '음성인식으로 조작하는 스마트 가전', color: 'emerald', x: 26, y: 78 },
-                { id: 'b2_4', name: '빅데이터 운세 코너', desc: '사주와 알고리즘이 결합한 미래 운세', color: 'amber', x: 33, y: 52 },
-                { id: 'b2_5', name: '자연 에너지 체험관', desc: '태양광 자동차 경주 대결', color: 'amber', x: 40, y: 56 },
-                { id: 'b2_6', name: '업사이클링 굿즈샵', desc: '버려지는 폐현수막 가방 제작', color: 'emerald', x: 47, y: 54 },
-                { id: 'b2_7', name: '야호! 게임 토너먼트', desc: '모바일 e스포츠 토너먼트 대회', color: 'indigo', x: 54, y: 56 },
-                { id: 'b2_8', name: '미래 식량 바이오', desc: '식물성 대체육 햄버거 시식회', color: 'amber', x: 62, y: 58 },
-                { id: 'b2_9', name: '디지털 캘리그라피', desc: '아이패드로 작성하는 커스텀 문구', color: 'amber', x: 81, y: 54 },
-                { id: 'b2_10', name: '홀로그램 포토존', desc: '입체 3D 3D 홀로그램 기념사진 촬영', color: 'amber', x: 86, y: 72 },
-                { id: 'b2_11', name: '로봇 파이팅 배틀', desc: '배틀로봇 상호 격투 대회', color: 'indigo', x: 78, y: 78 },
-                { id: 'b2_12', name: '버스킹 공연 무대', desc: '어쿠스틱 듀오 감성 노래 무대', color: 'amber', x: 37, y: 82 },
-                { id: 'b2_13', name: '스티커 수집 본부', desc: '모든 스티커 모으고 뽑기 도전!', color: 'emerald', x: 45, y: 82 }
+                { id: 'b2_1', name: '우주 항공 탐사대', desc: '운영자: 강우주\n누리호 모형 제작', color: 'amber', x: 18, y: 55 },
+                { id: 'b2_2', name: '사이버 보안 챌린지', desc: '운영자: 해커박\n해킹 방어 미션', color: 'indigo', x: 14, y: 72 },
+                { id: 'b2_3', name: 'IoT 스마트홈 시스템', desc: '운영자: 스마트이\n음성인식 가전 체험', color: 'emerald', x: 26, y: 78 },
+                { id: 'b2_4', name: '빅데이터 운세 코너', desc: '운영자: 데이터신\n알고리즘 미래 운세', color: 'amber', x: 33, y: 52 },
+                { id: 'b2_5', name: '자연 에너지 체험관', desc: '운영자: 태양선\n태양광 경주 대결', color: 'amber', x: 40, y: 56 },
+                { id: 'b2_6', name: '업사이클링 굿즈샵', desc: '운영자: 에코김\n폐현수막 가방 제작', color: 'emerald', x: 47, y: 54 },
+                { id: 'b2_7', name: '야호! 게임 토너먼트', desc: '운영자: 게임왕\ne스포츠 토너먼트', color: 'indigo', x: 54, y: 56 },
+                { id: 'b2_8', name: '미래 식량 바이오', desc: '운영자: 대체육\n식물성 패티 시식회', color: 'amber', x: 62, y: 58 },
+                { id: 'b2_9', name: '디지털 캘리그라피', desc: '운영자: 캘리손\n아이패드 붓글씨 문구', color: 'amber', x: 81, y: 54 },
+                { id: 'b2_10', name: '홀로그램 포토존', desc: '운영자: 입체조\n3D 홀로그램 사진', color: 'amber', x: 86, y: 72 },
+                { id: 'b2_11', name: '로봇 파이팅 배틀', desc: '운영자: 배틀킹\n로봇 상호 격투', color: 'indigo', x: 78, y: 78 },
+                { id: 'b2_12', name: '버스킹 공연 무대', desc: '운영자: 감성듀오\n어쿠스틱 감성 노래', color: 'amber', x: 37, y: 82 }
             ],
             3: [
-                { id: 'b3_1', name: '미래 로봇 수술실', desc: '의료용 수술 로봇의 정밀 원격 조종', color: 'amber', x: 18, y: 55 },
-                { id: 'b3_2', name: '도심 항공 UAM 체험', desc: '플라잉 카 조종 시뮬레이터', color: 'indigo', x: 14, y: 72 },
-                { id: 'b3_3', name: '블록체인 인증 센터', desc: '나만의 참가 NFT 즉시 발급하기', color: 'emerald', x: 26, y: 78 },
-                { id: 'b3_4', name: '생성형 AI 웹툰', desc: '키워드로 완성하는 4컷 툰 만들기', color: 'amber', x: 33, y: 52 },
-                { id: 'b3_5', name: '스마트 팜 농장', desc: '수경재배 스마트 키트 분양', color: 'emerald', x: 40, y: 56 },
-                { id: 'b3_6', name: '지구 살리기 챌린지', desc: '탄소중립 에코 퀴즈 및 선물', color: 'amber', x: 47, y: 54 },
-                { id: 'b3_7', name: '야호! 최종 시상식', desc: '우수 참여팀 메달 상장 수여식', color: 'indigo', x: 54, y: 56 },
-                { id: 'b3_8', name: '양자 컴퓨터 퀴즈', desc: '양자역학 알고리즘 퀴즈 미션', color: 'amber', x: 62, y: 58 },
-                { id: 'b3_9', name: '메이커스 플리마켓', desc: '청소년 크리에이터 수제 굿즈 판매', color: 'amber', x: 81, y: 54 },
-                { id: 'b3_10', name: 'VR 패러글라이딩', desc: '바람 느끼는 체감형 VR 시뮬레이션', color: 'amber', x: 86, y: 72 },
-                { id: 'b3_11', name: '알고리즘 방탈출', desc: '암호를 풀어 탈출하는 10분 미션', color: 'indigo', x: 78, y: 78 },
-                { id: 'b3_12', name: '폐막 축하 공연팀', desc: '화려한 댄스 퍼포먼스 및 마무리 무대', color: 'amber', x: 37, y: 82 },
-                { id: 'b3_13', name: '스티커 전송 리워드', desc: '최종 응원 스티커 집계 선물 교환', color: 'emerald', x: 45, y: 82 }
+                { id: 'b3_1', name: '미래 로봇 수술실', desc: '운영자: 닥터로봇\n원격 수술 시뮬레이션', color: 'amber', x: 18, y: 55 },
+                { id: 'b3_2', name: '도심 항공 UAM 체험', desc: '운영자: 비행조\n플라잉 카 조종', color: 'indigo', x: 14, y: 72 },
+                { id: 'b3_3', name: '블록체인 인증 센터', desc: '운영자: 블록체인\n참가 NFT 발급', color: 'emerald', x: 26, y: 78 },
+                { id: 'b3_4', name: '생성형 AI 웹툰', desc: '운영자: 웹툰작가\n4컷 툰 만들기', color: 'amber', x: 33, y: 52 },
+                { id: 'b3_5', name: '스마트 팜 농장', desc: '운영자: 수경재배\n스마트 키트 분양', color: 'emerald', x: 40, y: 56 },
+                { id: 'b3_6', name: '지구 살리기 챌린지', desc: '운영자: 탄소제로\n에코 퀴즈 이벤트', color: 'amber', x: 47, y: 54 },
+                { id: 'b3_7', name: '야호! 최종 시상식', desc: '운영자: 운영본부\n우수팀 메달 수여', color: 'indigo', x: 54, y: 56 },
+                { id: 'b3_8', name: '양자 컴퓨터 퀴즈', desc: '운영자: 퀀텀박\n양자역학 미션', color: 'amber', x: 62, y: 58 },
+                { id: 'b3_9', name: '메이커스 플리마켓', desc: '운영자: 메이커스\n청소년 수제 굿즈', color: 'amber', x: 81, y: 54 },
+                { id: 'b3_10', name: 'VR 패러글라이딩', desc: '운영자: 바람조\n체감형 VR 비행', color: 'amber', x: 86, y: 72 },
+                { id: 'b3_11', name: '알고리즘 방탈출', desc: '운영자: 탈출마스터\n암호 해독 미션', color: 'indigo', x: 78, y: 78 },
+                { id: 'b3_12', name: '폐막 축하 공연팀', desc: '운영자: 댄스팀\n화려한 댄스 무대', color: 'amber', x: 37, y: 82 },
+                { id: 'b3_13', name: '스티커 전송 리워드', desc: '운영자: 스티커본부\n응원 집계 선물 교환', color: 'emerald', x: 45, y: 82 }
             ]
         };
 
@@ -431,7 +432,7 @@
         };
 
         function loadData() {
-            const saved = localStorage.getItem('booth_app_data_v2');
+            const saved = localStorage.getItem('booth_app_data_v3');
             if (saved) {
                 try {
                     appData = JSON.parse(saved);
@@ -442,7 +443,7 @@
         }
 
         function saveData() {
-            localStorage.setItem('booth_app_data_v2', JSON.stringify(appData));
+            localStorage.setItem('booth_app_data_v3', JSON.stringify(appData));
             renderSidebar();
             renderPins();
         }
@@ -457,14 +458,15 @@
         function switchDay(day) {
             currentDay = day;
             activeSelectedBoothId = null;
+            openBubbleBoothId = null;
             updatePlacementToolbar();
 
             for (let i = 1; i <= 3; i++) {
                 const btn = document.getElementById(`day-btn-${i}`);
                 if (i === day) {
-                    btn.className = "day-tab px-3 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm";
+                    btn.className = "day-tab flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 bg-indigo-600 text-white shadow-sm";
                 } else {
-                    btn.className = "day-tab px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white transition-all flex items-center gap-1.5";
+                    btn.className = "day-tab flex-1 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1";
                 }
             }
 
@@ -476,6 +478,7 @@
         function toggleMode() {
             isSetupMode = !isSetupMode;
             activeSelectedBoothId = null;
+            openBubbleBoothId = null;
 
             const modeBadge = document.getElementById('mode-badge');
             const modeBtnText = document.getElementById('mode-btn-text');
@@ -501,6 +504,23 @@
             updatePlacementToolbar();
             renderPins();
             renderSidebar();
+        }
+
+        function closeActiveBubble() {
+            if (openBubbleBoothId) {
+                openBubbleBoothId = null;
+                renderPins();
+            }
+        }
+
+        function toggleSpeechBubble(boothId, e) {
+            if (e) e.stopPropagation();
+            if (openBubbleBoothId === boothId) {
+                openBubbleBoothId = null;
+            } else {
+                openBubbleBoothId = boothId;
+            }
+            renderPins();
         }
 
         function renderSidebar() {
@@ -595,7 +615,7 @@
             teams.push({
                 id: newId,
                 name: `신규 부스 #${teams.length + 1}`,
-                desc: '부스 설명 및 안내 문구',
+                desc: '운영자 명단 및 설명',
                 color: 'amber',
                 x: null,
                 y: null
@@ -619,7 +639,7 @@
                     currentTeams.push({
                         id: `b${currentDay}_${Date.now()}_${idx}`,
                         name: line,
-                        desc: '현장 운영 부스',
+                        desc: '운영 명단 및 안내',
                         color: 'amber',
                         x: null,
                         y: null
@@ -700,24 +720,41 @@
 
             container.appendChild(curPin);
 
-            // 2. Booth Pins
+            // 2. Booth Pins (Only renders placed booths; 12 or 13 depending on day data)
             const teams = appData.days[currentDay] || [];
 
             teams.forEach((team, index) => {
-                if (team.x === null || team.y === null) return;
+                if (team.x === null || team.y === null) return; // 13th booth naturally hidden if unplaced or non-existent
 
                 const pin = document.createElement('div');
                 const isSelected = activeSelectedBoothId === team.id;
+                const isBubbleOpen = openBubbleBoothId === team.id;
                 const pinBg = getBgColorByColorName(team.color);
 
-                pin.className = `marker flex flex-col items-center group ${isSelected ? 'z-40 scale-110' : ''}`;
+                pin.className = `marker flex flex-col items-center group ${isSelected || isBubbleOpen ? 'z-40 scale-105' : ''}`;
                 pin.style.left = `${team.x}%`;
                 pin.style.top = `${team.y}%`;
 
+                // Speech Bubble Overlay content
+                let bubbleHtml = '';
+                if (isBubbleOpen && !isSetupMode) {
+                    const descFormatted = escapeHtml(team.desc || '등록된 운영지 및 명단 정보가 없습니다.').replace(/\n/g, '<br>');
+                    bubbleHtml = `
+                        <div class="speech-bubble" onclick="event.stopPropagation()">
+                            <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-700/80">
+                                <span class="text-[11px] font-black text-amber-400">부스 #${index + 1}</span>
+                                <button onclick="closeActiveBubble()" class="text-slate-400 hover:text-white text-xs">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <h4 class="font-bold text-xs text-slate-100 mb-1 leading-snug">${escapeHtml(team.name)}</h4>
+                            <div class="text-[11px] text-slate-300 leading-relaxed font-normal">${descFormatted}</div>
+                        </div>
+                    `;
+                }
+
                 pin.innerHTML = `
-                    <div class="marker-tooltip opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-xl border border-slate-700">
-                        ${escapeHtml(team.name)}
-                    </div>
+                    ${bubbleHtml}
                     <div class="w-8 h-8 rounded-full ${pinBg} font-black text-xs flex items-center justify-center border-2 border-white shadow-xl group-hover:scale-110 transition-transform">
                         ${index + 1}
                     </div>
@@ -731,7 +768,7 @@
                     if (isSetupMode) {
                         openBoothEditModal(team.id);
                     } else {
-                        openBoothModal(team, index + 1);
+                        toggleSpeechBubble(team.id, e);
                     }
                 };
 
@@ -750,7 +787,10 @@
         // Map Click Event: Direct Click Location & Record Booth Info
         const mapWrapper = document.getElementById('map-wrapper');
         mapWrapper.addEventListener('click', (e) => {
-            if (!isSetupMode) return;
+            if (!isSetupMode) {
+                closeActiveBubble();
+                return;
+            }
 
             const rect = mapWrapper.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -765,7 +805,6 @@
                 saveData();
                 updatePlacementToolbar();
             } else if (activeSelectedBoothId) {
-                // If existing booth selected to move position
                 const team = appData.days[currentDay].find(t => t.id === activeSelectedBoothId);
                 if (team) {
                     team.x = xPercent;
@@ -775,7 +814,6 @@
                 saveData();
                 updatePlacementToolbar();
             } else {
-                // Open Direct Modal to Create New Booth Pin with Name & Description
                 openBoothEditModal(null, xPercent, yPercent);
             }
         });
@@ -989,30 +1027,6 @@
         viewport.addEventListener('touchend', () => {
             isPanning = false;
         });
-
-        // Modal Display Functions
-        function openBoothModal(team, index) {
-            document.getElementById('modal-booth-badge').innerText = `부스 #${index}`;
-            document.getElementById('modal-day-badge').innerText = `${currentDay}일차`;
-            document.getElementById('modal-team-name').innerText = team.name;
-            document.getElementById('modal-desc').innerText = team.desc || '현재 일자에 해당하는 부스 운영팀입니다. 현장에서 진행되는 다양한 체험에 참여해 보세요!';
-
-            const modal = document.getElementById('booth-modal');
-            const card = document.getElementById('booth-modal-card');
-
-            modal.classList.remove('opacity-0', 'pointer-events-none');
-            card.classList.remove('scale-95');
-            card.classList.add('scale-100');
-        }
-
-        function closeBoothModal() {
-            const modal = document.getElementById('booth-modal');
-            const card = document.getElementById('booth-modal-card');
-
-            modal.classList.add('opacity-0', 'pointer-events-none');
-            card.classList.remove('scale-100');
-            card.classList.add('scale-95');
-        }
 
         function escapeHtml(text) {
             if (!text) return '';
