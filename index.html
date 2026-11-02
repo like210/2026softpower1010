@@ -1001,7 +1001,15 @@
             zoomLevel = 1;
             panX = 0;
             panY = 0;
+            // 부드러운 전환 효과 추가 및 트랜스폼 강제 업데이트
+            const wrapper = document.getElementById('map-wrapper');
+            wrapper.style.transition = 'transform 0.25s ease-out';
             updateTransform();
+    
+            // 드래그(Pan) 동작 시 원래 75ms 드래그 반응속도로 복원
+            setTimeout(() => {
+            wrapper.style.transition = 'transform 75ms ease-out';
+            }, 250);
         }
 
         viewport.addEventListener('mousedown', (e) => {
