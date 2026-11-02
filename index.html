@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>게릴라 부스 안내 시스템</title>
+    <title>게릴라 야~호! 부스 안내 시스템</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -237,8 +237,8 @@
                         <rect width="1000" height="700" fill="#FFFFFF"/>
                         
                         <!-- Top Banner / Title Header Artwork -->
-                        <text x="500" y="45" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="700" font-size="20" fill="#1e293b">2026 소프트파워1010</text>
-                        <text x="500" y="85" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="900" font-size="34" fill="#09090b"> SW-AI 체험 게릴라 부스 배치도 💖</text>
+                        <text x="500" y="45" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="700" font-size="20" fill="#1e293b">게릴라 야~호! 부스 야~호!</text>
+                        <text x="500" y="85" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="900" font-size="34" fill="#09090b">너의 도전에 응원 스티커 전송 완료 💖</text>
                         
                         <!-- Top TV Display Ribbon Line -->
                         <rect x="90" y="140" width="820" height="28" fill="#bfdbfe" rx="4"/>
@@ -334,19 +334,19 @@
                     <textarea id="modal-edit-desc" rows="2" placeholder="운영 내용이나 수행 인원 명단 작성..." class="w-full text-xs p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-500 resize-none"></textarea>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-1">마커 색상 설정</label>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">마커 구분 설정</label>
                     <div class="flex gap-2">
                         <label class="flex-1 cursor-pointer">
                             <input type="radio" name="pin-color" value="amber" checked class="peer hidden" />
-                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-amber-400 peer-checked:bg-amber-500 peer-checked:text-slate-950 font-bold transition">주황 (기본)</div>
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-amber-400 peer-checked:bg-amber-400 peer-checked:text-slate-950 font-bold transition">노랑 (1학년)</div>
                         </label>
                         <label class="flex-1 cursor-pointer">
-                            <input type="radio" name="pin-color" value="emerald" class="peer hidden" />
-                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-emerald-400 peer-checked:bg-emerald-500 peer-checked:text-slate-950 font-bold transition">초록 (체험)</div>
+                            <input type="radio" name="pin-color" value="sky" class="peer hidden" />
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-sky-400 peer-checked:bg-sky-400 peer-checked:text-slate-950 font-bold transition">파랑 (2학년)</div>
                         </label>
                         <label class="flex-1 cursor-pointer">
-                            <input type="radio" name="pin-color" value="indigo" class="peer hidden" />
-                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-indigo-400 peer-checked:bg-indigo-500 peer-checked:text-white font-bold transition">보라 (이벤트)</div>
+                            <input type="radio" name="pin-color" value="rose" class="peer hidden" />
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-rose-400 peer-checked:bg-rose-500 peer-checked:text-white font-bold transition">핑크 (이벤트존)</div>
                         </label>
                     </div>
                 </div>
@@ -370,7 +370,7 @@
     <!-- Application JavaScript Logic -->
     <script>
         // Security Settings
-        const ADMIN_PASSWORD = "1234"; // 관리자 모드 접속 비밀번호 (필요 시 수정 가능)
+        const ADMIN_PASSWORD = "1234"; // 관리자 모드 접속 비밀번호
 
         // State Management
         let currentDay = 1;
@@ -378,50 +378,50 @@
         let activeSelectedBoothId = null;
         let openBubbleBoothId = null;
 
-        // Default Data for 3 Days (12 booths on Day 1 & 2, 13 booths on Day 3)
+        // Default Data for 3 Days (amber = 1학년 노랑, sky = 2학년 파랑, rose = 이벤트존 핑크)
         const initialDaysData = {
             1: [
                 { id: 'b1_1', name: '스마트 로봇 체험팀', desc: '운영자: 김로봇, 이지능\n자율주행 주행 시연존', color: 'amber', x: 18, y: 55 },
-                { id: 'b1_2', name: '드론 자율주행 연구소', desc: '운영자: 박드론\n레이싱 및 안전 교육', color: 'indigo', x: 14, y: 72 },
+                { id: 'b1_2', name: '드론 자율주행 연구소', desc: '운영자: 박드론\n레이싱 및 안전 교육', color: 'rose', x: 14, y: 72 },
                 { id: 'b1_3', name: '3D 프린팅 스튜디오', desc: '운영자: 최프린터\n나비 키링 만들기 DIY', color: 'amber', x: 26, y: 78 },
-                { id: 'b1_4', name: 'AI 화가 및 초상화', desc: '운영자: 정화가\nAI 캐리커처 제작', color: 'emerald', x: 33, y: 52 },
+                { id: 'b1_4', name: 'AI 화가 및 초상화', desc: '운영자: 정화가\nAI 캐리커처 제작', color: 'sky', x: 33, y: 52 },
                 { id: 'b1_5', name: '메타버스 VR 체험관', desc: '운영자: 강가상\nVR 롤러코스터 체험', color: 'amber', x: 40, y: 56 },
-                { id: 'b1_6', name: '친환경 캡슐 공방', desc: '운영자: 조재활\n업사이클링 악세서리', color: 'emerald', x: 47, y: 54 },
-                { id: 'b1_7', name: '게릴라 야호 퀴즈존', desc: '운영자: 윤퀴즈\n응원 스티커 이벤트', color: 'indigo', x: 54, y: 56 },
+                { id: 'b1_6', name: '친환경 캡슐 공방', desc: '운영자: 조재활\n업사이클링 악세서리', color: 'sky', x: 47, y: 54 },
+                { id: 'b1_7', name: '게릴라 야호 퀴즈존', desc: '운영자: 윤퀴즈\n응원 스티커 이벤트', color: 'rose', x: 54, y: 56 },
                 { id: 'b1_8', name: '스마트 헬스케어', desc: '운영자: 장건강\n체성분 측정 시연', color: 'amber', x: 62, y: 58 },
                 { id: 'b1_9', name: '코딩 아카데미 메이커', desc: '운영자: 임코딩\n아두이노 실습 교실', color: 'amber', x: 81, y: 54 },
-                { id: 'b1_10', name: '자율주행 모빌리티', desc: '운영자: 한휠\n전동 휠 시승 및 가이드', color: 'emerald', x: 86, y: 72 },
+                { id: 'b1_10', name: '자율주행 모빌리티', desc: '운영자: 한휠\n전동 휠 시승 및 가이드', color: 'sky', x: 86, y: 72 },
                 { id: 'b1_11', name: '창의 과학 실험실', desc: '운영자: 오실험\n액체질소 퍼포먼스', color: 'amber', x: 78, y: 78 },
-                { id: 'b1_12', name: '청소년 밴드 동아리', desc: '운영자: 송라이터\n록 밴드 라이브 공연', color: 'indigo', x: 37, y: 82 }
+                { id: 'b1_12', name: '청소년 밴드 동아리', desc: '운영자: 송라이터\n록 밴드 라이브 공연', color: 'rose', x: 37, y: 82 }
             ],
             2: [
                 { id: 'b2_1', name: '우주 항공 탐사대', desc: '운영자: 강우주\n누리호 모형 제작', color: 'amber', x: 18, y: 55 },
-                { id: 'b2_2', name: '사이버 보안 챌린지', desc: '운영자: 해커박\n해킹 방어 미션', color: 'indigo', x: 14, y: 72 },
-                { id: 'b2_3', name: 'IoT 스마트홈 시스템', desc: '운영자: 스마트이\n음성인식 가전 체험', color: 'emerald', x: 26, y: 78 },
+                { id: 'b2_2', name: '사이버 보안 챌린지', desc: '운영자: 해커박\n해킹 방어 미션', color: 'rose', x: 14, y: 72 },
+                { id: 'b2_3', name: 'IoT 스마트홈 시스템', desc: '운영자: 스마트이\n음성인식 가전 체험', color: 'sky', x: 26, y: 78 },
                 { id: 'b2_4', name: '빅데이터 운세 코너', desc: '운영자: 데이터신\n알고리즘 미래 운세', color: 'amber', x: 33, y: 52 },
                 { id: 'b2_5', name: '자연 에너지 체험관', desc: '운영자: 태양선\n태양광 경주 대결', color: 'amber', x: 40, y: 56 },
-                { id: 'b2_6', name: '업사이클링 굿즈샵', desc: '운영자: 에코김\n폐현수막 가방 제작', color: 'emerald', x: 47, y: 54 },
-                { id: 'b2_7', name: '야호! 게임 토너먼트', desc: '운영자: 게임왕\ne스포츠 토너먼트', color: 'indigo', x: 54, y: 56 },
+                { id: 'b2_6', name: '업사이클링 굿즈샵', desc: '운영자: 에코김\n폐현수막 가방 제작', color: 'sky', x: 47, y: 54 },
+                { id: 'b2_7', name: '야호! 게임 토너먼트', desc: '운영자: 게임왕\ne스포츠 토너먼트', color: 'rose', x: 54, y: 56 },
                 { id: 'b2_8', name: '미래 식량 바이오', desc: '운영자: 대체육\n식물성 패티 시식회', color: 'amber', x: 62, y: 58 },
                 { id: 'b2_9', name: '디지털 캘리그라피', desc: '운영자: 캘리손\n아이패드 붓글씨 문구', color: 'amber', x: 81, y: 54 },
                 { id: 'b2_10', name: '홀로그램 포토존', desc: '운영자: 입체조\n3D 홀로그램 사진', color: 'amber', x: 86, y: 72 },
-                { id: 'b2_11', name: '로봇 파이팅 배틀', desc: '운영자: 배틀킹\n로봇 상호 격투', color: 'indigo', x: 78, y: 78 },
+                { id: 'b2_11', name: '로봇 파이팅 배틀', desc: '운영자: 배틀킹\n로봇 상호 격투', color: 'rose', x: 78, y: 78 },
                 { id: 'b2_12', name: '버스킹 공연 무대', desc: '운영자: 감성듀오\n어쿠스틱 감성 노래', color: 'amber', x: 37, y: 82 }
             ],
             3: [
                 { id: 'b3_1', name: '미래 로봇 수술실', desc: '운영자: 닥터로봇\n원격 수술 시뮬레이션', color: 'amber', x: 18, y: 55 },
-                { id: 'b3_2', name: '도심 항공 UAM 체험', desc: '운영자: 비행조\n플라잉 카 조종', color: 'indigo', x: 14, y: 72 },
-                { id: 'b3_3', name: '블록체인 인증 센터', desc: '운영자: 블록체인\n참가 NFT 발급', color: 'emerald', x: 26, y: 78 },
+                { id: 'b3_2', name: '도심 항공 UAM 체험', desc: '운영자: 비행조\n플라잉 카 조종', color: 'rose', x: 14, y: 72 },
+                { id: 'b3_3', name: '블록체인 인증 센터', desc: '운영자: 블록체인\n참가 NFT 발급', color: 'sky', x: 26, y: 78 },
                 { id: 'b3_4', name: '생성형 AI 웹툰', desc: '운영자: 웹툰작가\n4컷 툰 만들기', color: 'amber', x: 33, y: 52 },
-                { id: 'b3_5', name: '스마트 팜 농장', desc: '운영자: 수경재배\n스마트 키트 분양', color: 'emerald', x: 40, y: 56 },
+                { id: 'b3_5', name: '스마트 팜 농장', desc: '운영자: 수경재배\n스마트 키트 분양', color: 'sky', x: 40, y: 56 },
                 { id: 'b3_6', name: '지구 살리기 챌린지', desc: '운영자: 탄소제로\n에코 퀴즈 이벤트', color: 'amber', x: 47, y: 54 },
-                { id: 'b3_7', name: '야호! 최종 시상식', desc: '운영자: 운영본부\n우수팀 메달 수여', color: 'indigo', x: 54, y: 56 },
+                { id: 'b3_7', name: '야호! 최종 시상식', desc: '운영자: 운영본부\n우수팀 메달 수여', color: 'rose', x: 54, y: 56 },
                 { id: 'b3_8', name: '양자 컴퓨터 퀴즈', desc: '운영자: 퀀텀박\n양자역학 미션', color: 'amber', x: 62, y: 58 },
                 { id: 'b3_9', name: '메이커스 플리마켓', desc: '운영자: 메이커스\n청소년 수제 굿즈', color: 'amber', x: 81, y: 54 },
                 { id: 'b3_10', name: 'VR 패러글라이딩', desc: '운영자: 바람조\n체감형 VR 비행', color: 'amber', x: 86, y: 72 },
-                { id: 'b3_11', name: '알고리즘 방탈출', desc: '운영자: 탈출마스터\n암호 해독 미션', color: 'indigo', x: 78, y: 78 },
+                { id: 'b3_11', name: '알고리즘 방탈출', desc: '운영자: 탈출마스터\n암호 해독 미션', color: 'rose', x: 78, y: 78 },
                 { id: 'b3_12', name: '폐막 축하 공연팀', desc: '운영자: 댄스팀\n화려한 댄스 무대', color: 'amber', x: 37, y: 82 },
-                { id: 'b3_13', name: '스티커 전송 리워드', desc: '운영자: 스티커본부\n응원 집계 선물 교환', color: 'emerald', x: 45, y: 82 }
+                { id: 'b3_13', name: '스티커 전송 리워드', desc: '운영자: 스티커본부\n응원 집계 선물 교환', color: 'sky', x: 45, y: 82 }
             ]
         };
 
@@ -435,7 +435,7 @@
         };
 
         function loadData() {
-            const saved = localStorage.getItem('booth_app_data_v3');
+            const saved = localStorage.getItem('booth_app_data_v4');
             if (saved) {
                 try {
                     appData = JSON.parse(saved);
@@ -446,7 +446,7 @@
         }
 
         function saveData() {
-            localStorage.setItem('booth_app_data_v3', JSON.stringify(appData));
+            localStorage.setItem('booth_app_data_v4', JSON.stringify(appData));
             renderSidebar();
             renderPins();
         }
@@ -479,10 +479,9 @@
         }
 
         function toggleMode() {
-            // 관리자 모드로 전환하려는 경우 비밀번호 확인
             if (!isSetupMode) {
                 const inputPassword = prompt("관리자 설정 모드로 전환하려면 비밀번호를 입력하세요:");
-                if (inputPassword === null) return; // 취소 버튼을 누른 경우
+                if (inputPassword === null) return;
                 
                 if (inputPassword !== ADMIN_PASSWORD) {
                     alert("비밀번호가 올바르지 않습니다.");
@@ -615,10 +614,12 @@
             document.getElementById('placed-count').innerText = placedCount;
         }
 
+        // 노랑: 1학년(amber), 파랑: 2학년(sky), 핑크: 이벤트존(rose)
         function getBgColorByColorName(color) {
             switch(color) {
-                case 'emerald': return 'bg-emerald-400';
-                case 'indigo': return 'bg-indigo-400 text-white';
+                case 'sky': return 'bg-sky-400';
+                case 'rose': return 'bg-rose-400 text-white';
+                case 'amber':
                 default: return 'bg-amber-400';
             }
         }
@@ -734,7 +735,7 @@
 
             container.appendChild(curPin);
 
-            // 2. Booth Pins (Only renders placed booths)
+            // 2. Booth Pins
             const teams = appData.days[currentDay] || [];
 
             teams.forEach((team, index) => {
@@ -1001,14 +1002,11 @@
             zoomLevel = 1;
             panX = 0;
             panY = 0;
-            // 부드러운 전환 효과 추가 및 트랜스폼 강제 업데이트
-            const wrapper = document.getElementById('map-wrapper');
             wrapper.style.transition = 'transform 0.25s ease-out';
             updateTransform();
-    
-            // 드래그(Pan) 동작 시 원래 75ms 드래그 반응속도로 복원
+            
             setTimeout(() => {
-            wrapper.style.transition = 'transform 75ms ease-out';
+                wrapper.style.transition = 'transform 75ms ease-out';
             }, 250);
         }
 
