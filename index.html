@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>게릴라 야~호! 부스 안내 시스템</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body {
+            font-family: 'Pretendard', sans-serif;
+            user-select: none;
+        }
+
+        .map-container {
+            position: relative;
+            overflow: hidden;
+            background-color: #f8fafc;
+            touch-action: none;
+        }
+
+        .marker {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            transition: transform 0.15s ease, filter 0.15s ease;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .marker:hover {
+            transform: translate(-50%, -108%) scale(1.1);
+            z-index: 30;
+        }
+
+        .marker.current-location {
+            transform: translate(-50%, -100%);
+            z-index: 25;
+        }
+
+        .pulse-ring {
+            position: absolute;
+            top: 75%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px;
+            height: 36px;
+            background-color: rgba(239, 68, 68, 0.4);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2.2);
+                opacity: 0;
+            }
+        }
+
+        .speech-bubble {
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #0f172a;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 10px 14px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            white-space: normal;
+            width: 190px;
+            z-index: 50;
+            animation: bubbleFadeIn 0.2s ease-out;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 7px;
+            border-style: solid;
+            border-color: #0f172a transparent transparent transparent;
+        }
+
+        @keyframes bubbleFadeIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, 8px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+        }
+
+        .grid-overlay {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(203, 213, 225, 0.3) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(203, 213, 225, 0.3) 1px, transparent 1px);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-800 text-white border-b border-slate-700 px-4 py-3 flex items-center justify-between gap-3 shrink-0 z-40">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-r from-amber-500 to-rose-500 p-2 rounded-xl text-white shadow-md">
+                <i class="fa-solid font-bold fa-map-location-dot text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight tracking-tight text-white flex items-center gap-2">
+                    게릴라 야~호! 부스 안내 📍
+                    <span id="mode-badge" class="text-xs px-2 py-0.5 rounded-full bg-indigo-600 text-indigo-100 font-medium">안내 모드</span>
+                </h1>
+                <p class="text-xs text-slate-400 hidden sm:block">실시간 부스 위치 확인 및 3일간 통합 관리 시스템</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button onclick="fetchGoogleSheetData()" title="구글 시트 최신 데이터 동기화" class="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-xs transition-all flex items-center gap-1.5 border border-slate-600">
+                <i class="fa-solid fa-rotate text-emerald-400"></i>
+                <span class="hidden md:inline">시트 동기화</span>
+            </button>
+            <button onclick="toggleMode()" id="mode-toggle-btn" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm transition-all flex items-center gap-2 shadow-lg hover:shadow-amber-500/20 active:scale-95">
+                <i class="fa-solid fa-gear"></i>
+                <span id="mode-btn-text">부스 위치 및 팀 설정</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <aside id="admin-sidebar" class="w-80 bg-slate-800 border-r border-slate-700 flex flex-col h-full transition-all duration-300 transform -translate-x-full absolute left-0 top-0 bottom-0 z-30 shadow-2xl hidden">
+            <div class="p-3 bg-slate-900 border-b border-slate-700 flex flex-col gap-1.5">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">운영 일차 선택</span>
+                <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 justify-between">
+                    <button onclick="switchDay(1)" id="day-btn-1" class="day-tab flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 bg-indigo-600 text-white shadow-sm">
+                        <i class="fa-regular fa-calendar-check text-xs"></i> 1일차
+                    </button>
+                    <button onclick="switchDay(2)" id="day-btn-2" class="day-tab flex-1 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1">
+                        <i class="fa-regular fa-calendar text-xs"></i> 2일차
+                    </button>
+                    <button onclick="switchDay(3)" id="day-btn-3" class="day-tab flex-1 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1">
+                        <i class="fa-regular fa-calendar text-xs"></i> 3일차
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-850">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-amber-400"></i>
+                    <h2 class="font-bold text-slate-100 text-sm">
+                        <span id="sidebar-day-title">1일차</span> 부스 명단 관리
+                    </h2>
+                </div>
+                <button onclick="addNewBoothFromSidebar()" class="text-xs text-amber-300 hover:text-amber-200 font-bold px-2.5 py-1 rounded bg-amber-500/20 border border-amber-500/40 transition">
+                    + 부스 추가
+                </button>
+            </div>
+
+            <div class="p-3 border-b border-slate-700/60 bg-slate-900/40">
+                <label class="block text-xs font-medium text-slate-400 mb-1">
+                    팀명 목록 일괄등록 <span class="text-slate-500">(줄바꿈 구분)</span>
+                </label>
+                <div class="flex gap-1.5">
+                    <textarea id="bulk-input" rows="2" placeholder="팀명 1&#10;팀명 2&#10;팀명 3..." class="w-full text-xs p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-500 resize-none"></textarea>
+                    <button onclick="applyBulkTeams()" class="px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shrink-0 transition">
+                        적용
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-2 text-xs bg-amber-950/40 text-amber-300 border-b border-amber-900/30 flex items-center gap-1.5 px-3">
+                <i class="fa-solid fa-circle-info text-amber-400"></i>
+                <span>지도의 원하는 위치를 직접 클릭하여 마킹을 생성 및 등록하세요!</span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-2.5" id="team-list-container"></div>
+
+            <div class="p-3 border-t border-slate-700 bg-slate-850 flex justify-between items-center text-xs text-slate-400">
+                <span>등록된 부스: <strong id="placed-count" class="text-amber-400">0</strong>개</span>
+                <button onclick="toggleMode()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition">
+                    설정 완료 & Save
+                </button>
+            </div>
+        </aside>
+
+        <!-- Map Workspace -->
+        <main class="w-full h-full relative bg-slate-950 flex flex-col items-center justify-center overflow-hidden" onclick="closeActiveBubble()">
+            <div class="absolute top-4 right-4 z-20 flex flex-col gap-2 bg-slate-800/90 backdrop-blur border border-slate-700 p-1.5 rounded-xl shadow-xl">
+                <button onclick="zoomIn()" class="w-8 h-8 flex items-center justify-center text-slate-200 hover:bg-slate-700 rounded-lg transition" title="확대">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+                <button onclick="zoomOut()" class="w-8 h-8 flex items-center justify-center text-slate-200 hover:bg-slate-700 rounded-lg transition" title="축소">
+                    <i class="fa-solid fa-minus"></i>
+                </button>
+                <button onclick="resetZoom()" class="w-8 h-8 flex items-center justify-center text-slate-200 hover:bg-slate-700 rounded-lg transition" title="화면 맞춤">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+            </div>
+
+            <div id="map-viewport" class="w-full h-full relative cursor-grab active:cursor-grabbing overflow-hidden flex items-center justify-center">
+                <div id="map-wrapper" class="relative inline-block transition-transform duration-75 origin-center shadow-2xl">
+                    <svg id="base-svg-map" class="w-full h-auto max-h-[85vh] rounded-xl shadow-2xl select-none block" viewBox="0 0 1000 700" style="min-width: 600px; background: #ffffff;">
+                        <rect width="1000" height="700" fill="#FFFFFF"/>
+                        <text x="500" y="45" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="700" font-size="20" fill="#1e293b">게릴라 야~호! 부스 야~호!</text>
+                        <text x="500" y="85" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="900" font-size="34" fill="#09090b">너의 도전에 응원 스티커 전송 완료 💖</text>
+                        
+                        <rect x="90" y="140" width="820" height="28" fill="#bfdbfe" rx="4"/>
+                        <g transform="translate(100, 125)">
+                            <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
+                            <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <line x1="35" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <circle cx="43" cy="14" r="2.5" fill="#1e293b"/>
+                            <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
+                        </g>
+                        <g transform="translate(360, 125)">
+                            <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
+                            <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <line x1="35" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <circle cx="43" cy="14" r="2.5" fill="#1e293b"/>
+                            <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
+                        </g>
+                        <g transform="translate(620, 125)">
+                            <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
+                            <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <line x1="35" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <circle cx="43" cy="14" r="2.5" fill="#1e293b"/>
+                            <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
+                        </g>
+                        <g transform="translate(880, 125)">
+                            <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
+                            <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <line x1="35" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
+                            <circle cx="43" cy="14" r="2.5" fill="#1e293b"/>
+                            <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
+                        </g>
+
+                        <path d="M 200,430 A 130,130 0 1,0 140,580" fill="none" stroke="#38bdf8" stroke-width="46" stroke-linecap="round"/>
+                        <path d="M 300,410 A 110,110 0 0,1 500,420" fill="none" stroke="#fbbf24" stroke-width="42" stroke-linecap="round"/>
+                        <path d="M 490,420 A 90,90 0 0,1 660,430" fill="none" stroke="#fbbf24" stroke-width="38" stroke-linecap="round"/>
+                        <path d="M 800,420 A 130,130 0 1,1 860,580" fill="none" stroke="#38bdf8" stroke-width="46" stroke-linecap="round"/>
+                        <path d="M 320,590 A 90,90 0 0,0 480,590" fill="none" stroke="#78350f" stroke-width="38" stroke-linecap="round"/>
+
+                        <text x="135" y="495" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#0369a1" text-anchor="middle">A 존</text>
+                        <text x="400" y="340" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#b45309" text-anchor="middle">B 존</text>
+                        <text x="580" y="360" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#b45309" text-anchor="middle">C 존</text>
+                        <text x="880" y="495" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#0369a1" text-anchor="middle">D 존</text>
+                        <text x="400" y="655" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#451a03" text-anchor="middle">E 존</text>
+                    </svg>
+
+                    <div id="pins-layer" class="absolute inset-0 w-full h-full pointer-events-auto"></div>
+                    <div id="grid-overlay" class="absolute inset-0 grid-overlay pointer-events-none hidden opacity-60"></div>
+                </div>
+            </div>
+
+            <div id="placement-toolbar" class="absolute bottom-6 bg-slate-800/95 text-white border border-slate-700 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 z-30 transition-all transform translate-y-24 opacity-0 pointer-events-none">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-amber-400 animate-ping"></span>
+                    <span class="text-sm font-medium">선택된 부스: <strong id="selected-booth-name" class="text-amber-400 font-bold">팀을 선택하세요</strong></span>
+                </div>
+                <button onclick="clearSelectedPlacement()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-200 transition">
+                    선택 취소
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: Direct Click Add/Edit Booth Marker -->
+    <div id="booth-edit-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl transform scale-95 transition-transform duration-200" id="booth-edit-card">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold rounded-lg flex items-center gap-1">
+                        <i class="fa-solid fa-location-dot"></i> 마킹 및 부스명 기록
+                    </span>
+                </div>
+                <button onclick="closeBoothEditModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveBoothFromModal(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">부스/팀 이름</label>
+                    <input type="text" id="modal-edit-name" required placeholder="예: 미래식량연구소" class="w-full text-sm p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">부스 설명 (운영자 / 한줄소개)</label>
+                    <textarea id="modal-edit-desc" rows="2" placeholder="운영자 명단이나 한줄소개 작성..." class="w-full text-xs p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-500 resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">마커 구분 설정</label>
+                    <div class="flex gap-2">
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="pin-color" value="amber" checked class="peer hidden" />
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-amber-400 peer-checked:bg-amber-400 peer-checked:text-slate-950 font-bold transition">노랑 (1학년)</div>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="pin-color" value="sky" class="peer hidden" />
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-sky-400 peer-checked:bg-sky-400 peer-checked:text-slate-950 font-bold transition">파랑 (2학년)</div>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="pin-color" value="rose" class="peer hidden" />
+                            <div class="py-1.5 rounded-lg border border-slate-700 text-center text-xs text-rose-400 peer-checked:bg-rose-500 peer-checked:text-white font-bold transition">핑크 (이벤트존)</div>
+                        </label>
+                    </div>
+                </div>
+
+                <input type="hidden" id="modal-edit-x" />
+                <input type="hidden" id="modal-edit-y" />
+                <input type="hidden" id="modal-edit-id" />
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" onclick="deleteBoothFromModal()" id="modal-delete-btn" class="px-3 py-2.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-xs font-bold rounded-xl transition">
+                        삭제
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-sm font-bold transition shadow-lg shadow-amber-500/20">
+                        기록 저장하기
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        const ADMIN_PASSWORD = "1234"; 
+
+        // ⚠️ 아래 큰따옴표 안에 생성하신 Apps Script 웹 앱 URL을 넣으세요!
+        const GAS_WEB_APP_URL = "https://script.googleusercontent.com/a/macros/on.use.go.kr/echo?user_content_key=AUkAhnSXxvNvXO5KBSc9JGbTLBjqtN111uu4GKY1G6Yj-nGCH8s7Xt_8A6l9h_EK5hWa1giuei2aRXD3nJKdP0OPL6DlEBk2QQFvBzWA7Mopo4bYEHyjka2a1zlaKrtdZjHVOuxRrf_9huiF3pzQGznT7iZsv2MkpEqkCXpkd7xDKLxAI6x4Qk2tCnVTizmPxoSI8tsLEps0FCYCjqGuLrphlVjHS6twq_va4HlYLoj_dS8Dnf13H1JJ7ae2-OTouaXxmCodcgYgxNhwEDrJ5uh3cSuIkw1nybFweyBEqKFK&lib=MLN6mVCshY2-n1wPjg0a426-NPiLuMcbZ";
+
+        let currentDay = 1;
+        let isSetupMode = false;
+        let activeSelectedBoothId = null;
+        let openBubbleBoothId = null;
+
+        const defaultCoordinates = [
+            { x: 18, y: 55 }, { x: 14, y: 72 }, { x: 26, y: 78 }, { x: 33, y: 52 },
+            { x: 40, y: 56 }, { x: 47, y: 54 }, { x: 54, y: 56 }, { x: 62, y: 58 },
+            { x: 81, y: 54 }, { x: 86, y: 72 }, { x: 78, y: 78 }, { x: 37, y: 82 }, { x: 45, y: 82 }
+        ];
+
+        let currentLocationPin = { x: 50, y: 22 };
+
+        let appData = {
+            days: { 1: [], 2: [], 3: [] },
+            currentLocation: { ...currentLocationPin }
+        };
+
+        // Apps Script JSON API 동기화 함수
+        async function fetchGoogleSheetData() {
+            if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_SCRIPT_ID_HERE")) {
+                console.warn("Apps Script 웹 앱 URL을 등록해주세요.");
+                return;
+            }
+
+            try {
+                const response = await fetch(GAS_WEB_APP_URL);
+                if (!response.ok) throw new Error('API 응답 실패');
+                
+                const rows = await response.json();
+
+                if (Array.isArray(rows) && rows.length > 0) {
+                    const newDays = { 1: [], 2: [], 3: [] };
+
+                    rows.forEach((row, idx) => {
+                        const dayNum = [1, 2, 3].includes(row.day) ? row.day : 1;
+                        const existingList = newDays[dayNum];
+
+                        // 학년 색상 매핑 (1학년: amber, 2학년: sky, 기타: rose)
+                        let color = 'amber';
+                        if (String(row.grade).includes('2')) color = 'sky';
+                        else if (String(row.grade).includes('이벤트') || String(row.grade).includes('3')) color = 'rose';
+
+                        let descText = '';
+                        if (row.operator) descText += `운영자: ${row.operator}`;
+                        if (row.intro) descText += (descText ? '\n' : '') + row.intro;
+
+                        const posIndex = (row.boothNo && row.boothNo > 0) ? (row.boothNo - 1) : existingList.length;
+                        const coord = defaultCoordinates[posIndex % defaultCoordinates.length];
+
+                        const displayName = row.name || (row.boothNo ? `부스 #${row.boothNo}` : `부스 #${existingList.length + 1}`);
+
+                        existingList.push({
+                            id: `b${dayNum}_${row.boothNo || (existingList.length + 1)}`,
+                            name: displayName,
+                            desc: descText,
+                            color: color,
+                            x: coord.x,
+                            y: coord.y
+                        });
+                    });
+
+                    appData.days = newDays;
+                    saveData();
+                    console.log('Apps Script를 통한 구글 시트 동기화 완료!');
+                }
+            } catch (err) {
+                console.error('구글 시트 Apps Script 로드 실패:', err);
+            }
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('booth_app_data_v7');
+            if (saved) {
+                try {
+                    appData = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to parse saved booth data', e);
+                }
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('booth_app_data_v7', JSON.stringify(appData));
+            renderSidebar();
+            renderPins();
+        }
+
+        window.addEventListener('load', async () => {
+            loadData();
+            await fetchGoogleSheetData();
+            switchDay(1);
+            resetZoom();
+            lucide.createIcons();
+        });
+
+        function switchDay(day) {
+            currentDay = day;
+            activeSelectedBoothId = null;
+            openBubbleBoothId = null;
+            updatePlacementToolbar();
+
+            for (let i = 1; i <= 3; i++) {
+                const btn = document.getElementById(`day-btn-${i}`);
+                if (i === day) {
+                    btn.className = "day-tab flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 bg-indigo-600 text-white shadow-sm";
+                } else {
+                    btn.className = "day-tab flex-1 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1";
+                }
+            }
+
+            document.getElementById('sidebar-day-title').innerText = `${day}일차`;
+            renderSidebar();
+            renderPins();
+        }
+
+        function toggleMode() {
+            if (!isSetupMode) {
+                const inputPassword = prompt("관리자 설정 모드로 전환하려면 비밀번호를 입력하세요:");
+                if (inputPassword === null) return;
+                
+                if (inputPassword !== ADMIN_PASSWORD) {
+                    alert("비밀번호가 올바르지 않습니다.");
+                    return;
+                }
+            }
+
+            isSetupMode = !isSetupMode;
+            activeSelectedBoothId = null;
+            openBubbleBoothId = null;
+
+            const modeBadge = document.getElementById('mode-badge');
+            const modeBtnText = document.getElementById('mode-btn-text');
+            const sidebar = document.getElementById('admin-sidebar');
+            const gridOverlay = document.getElementById('grid-overlay');
+
+            if (isSetupMode) {
+                modeBadge.className = "text-xs px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-bold";
+                modeBadge.innerText = "관리자 설정 모드";
+                modeBtnText.innerText = "안내 모드로 변경";
+                sidebar.classList.remove('hidden', '-translate-x-full');
+                sidebar.classList.add('translate-x-0');
+                gridOverlay.classList.remove('hidden');
+            } else {
+                modeBadge.className = "text-xs px-2 py-0.5 rounded-full bg-indigo-600 text-indigo-100 font-medium";
+                modeBadge.innerText = "안내 모드";
+                modeBtnText.innerText = "부스 위치 및 팀 설정";
+                sidebar.classList.remove('translate-x-0');
+                sidebar.classList.add('-translate-x-full', 'hidden');
+                gridOverlay.classList.add('hidden');
+            }
+
+            updatePlacementToolbar();
+            renderPins();
+            renderSidebar();
+        }
+
+        function closeActiveBubble() {
+            if (openBubbleBoothId) {
+                openBubbleBoothId = null;
+                renderPins();
+            }
+        }
+
+        function toggleSpeechBubble(boothId, e) {
+            if (e) e.stopPropagation();
+            if (openBubbleBoothId === boothId) {
+                openBubbleBoothId = null;
+            } else {
+                openBubbleBoothId = boothId;
+            }
+            renderPins();
+        }
+
+        function renderSidebar() {
+            const container = document.getElementById('team-list-container');
+            container.innerHTML = '';
+            const teams = appData.days[currentDay] || [];
+
+            let placedCount = 0;
+
+            const curLocItem = document.createElement('div');
+            curLocItem.className = `p-2.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                activeSelectedBoothId === 'CURRENT_LOCATION' 
+                ? 'bg-rose-950/60 border-rose-500 ring-2 ring-rose-500/30' 
+                : 'bg-slate-900 border-slate-700/80 hover:border-slate-600'
+            }`;
+            curLocItem.onclick = () => selectBoothForPlacement('CURRENT_LOCATION');
+            curLocItem.innerHTML = `
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                    <span class="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 font-bold text-xs shadow-md">
+                        📍
+                    </span>
+                    <div class="truncate">
+                        <div class="text-xs font-bold text-rose-300">현재 위치 핀</div>
+                        <div class="text-[10px] text-slate-400 truncate">선택 후 지도를 클릭하여 이동</div>
+                    </div>
+                </div>
+                <span class="text-[10px] px-2 py-0.5 bg-rose-900/50 text-rose-300 rounded font-medium border border-rose-700/50">
+                    공통
+                </span>
+            `;
+            container.appendChild(curLocItem);
+
+            const divider = document.createElement('div');
+            divider.className = "text-[11px] font-semibold text-slate-400 pt-2 pb-1 px-1 flex justify-between items-center";
+            divider.innerHTML = `<span>등록된 부스 (${teams.length}개)</span> <span class="text-[10px] text-amber-400 font-normal">클릭하여 정보 편집</span>`;
+            container.appendChild(divider);
+
+            teams.forEach((team, index) => {
+                if (team.x !== null && team.y !== null) placedCount++;
+
+                const isSelected = activeSelectedBoothId === team.id;
+                const item = document.createElement('div');
+                item.className = `p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
+                    isSelected 
+                    ? 'bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/30' 
+                    : team.x !== null 
+                        ? 'bg-slate-900 border-slate-700 hover:border-slate-600' 
+                        : 'bg-slate-900/40 border-slate-800 opacity-75'
+                }`;
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onclick="openBoothEditModal('${team.id}')">
+                        <span class="w-6 h-6 rounded-lg ${getBgColorByColorName(team.color)} text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
+                            ${index + 1}
+                        </span>
+                        <div class="flex flex-col truncate">
+                            <span class="text-xs text-slate-100 font-bold truncate">${escapeHtml(team.name)}</span>
+                            <span class="text-[10px] text-slate-400 truncate">${escapeHtml(team.desc || '설명 없음')}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="openBoothEditModal('${team.id}')" title="편집" class="text-slate-400 hover:text-amber-300 text-xs p-1">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        ${team.x !== null ? `
+                            <button onclick="removeBoothPosition('${team.id}')" title="위치 해제" class="text-slate-400 hover:text-rose-400 text-xs p-1">
+                                <i class="fa-solid fa-location-slash"></i>
+                            </button>
+                        ` : `
+                            <span class="text-[10px] text-slate-500 px-1.5 py-0.5 border border-slate-800 rounded">미배치</span>
+                        `}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+
+            document.getElementById('placed-count').innerText = placedCount;
+        }
+
+        function getBgColorByColorName(color) {
+            switch(color) {
+                case 'sky': return 'bg-sky-400';
+                case 'rose': return 'bg-rose-400 text-white';
+                case 'amber':
+                default: return 'bg-amber-400';
+            }
+        }
+
+        function addNewBoothFromSidebar() {
+            const teams = appData.days[currentDay] || [];
+            const newId = `b${currentDay}_${Date.now()}`;
+            teams.push({
+                id: newId,
+                name: `신규 부스 #${teams.length + 1}`,
+                desc: '운영자 명단 및 한줄소개',
+                color: 'amber',
+                x: null,
+                y: null
+            });
+            saveData();
+            openBoothEditModal(newId);
+        }
+
+        function applyBulkTeams() {
+            const textarea = document.getElementById('bulk-input');
+            const lines = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            
+            if (lines.length === 0) return;
+
+            const currentTeams = appData.days[currentDay] || [];
+            
+            lines.forEach((line, idx) => {
+                if (idx < currentTeams.length) {
+                    currentTeams[idx].name = line;
+                } else {
+                    currentTeams.push({
+                        id: `b${currentDay}_${Date.now()}_${idx}`,
+                        name: line,
+                        desc: '운영 명단 및 안내',
+                        color: 'amber',
+                        x: null,
+                        y: null
+                    });
+                }
+            });
+
+            textarea.value = '';
+            saveData();
+        }
+
+        function selectBoothForPlacement(boothId) {
+            if (!isSetupMode) return;
+            activeSelectedBoothId = (activeSelectedBoothId === boothId) ? null : boothId;
+            updatePlacementToolbar();
+            renderSidebar();
+        }
+
+        function clearSelectedPlacement() {
+            activeSelectedBoothId = null;
+            updatePlacementToolbar();
+            renderSidebar();
+        }
+
+        function updatePlacementToolbar() {
+            const toolbar = document.getElementById('placement-toolbar');
+            const nameEl = document.getElementById('selected-booth-name');
+
+            if (isSetupMode && activeSelectedBoothId) {
+                toolbar.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+                if (activeSelectedBoothId === 'CURRENT_LOCATION') {
+                    nameEl.innerText = "📍 현재 위치 핀 (이동 대기 중)";
+                } else {
+                    const team = appData.days[currentDay].find(t => t.id === activeSelectedBoothId);
+                    nameEl.innerText = team ? `${team.name} (위치 재지정)` : "선택됨";
+                }
+            } else {
+                toolbar.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function removeBoothPosition(boothId) {
+            const team = appData.days[currentDay].find(t => t.id === boothId);
+            if (team) {
+                team.x = null;
+                team.y = null;
+                saveData();
+            }
+        }
+
+        function renderPins() {
+            const container = document.getElementById('pins-layer');
+            container.innerHTML = '';
+
+            const curLoc = appData.currentLocation || currentLocationPin;
+            const curPin = document.createElement('div');
+            curPin.className = 'marker current-location flex flex-col items-center';
+            curPin.style.left = `${curLoc.x}%`;
+            curPin.style.top = `${curLoc.y}%`;
+
+            curPin.innerHTML = `
+                <div class="relative flex items-center justify-center">
+                    <div class="pulse-ring"></div>
+                    <img src="https://maps.google.com/mapfiles/ms/icons/red-dot.png" class="w-9 h-9 drop-shadow-lg filter hover:brightness-110 transition" alt="현재위치">
+                </div>
+                <div class="mt-0.5 bg-rose-600 text-white font-extrabold text-[11px] px-2 py-0.5 rounded-full shadow-lg border border-white flex items-center gap-1">
+                    <i class="fa-solid fa-location-crosshairs text-[10px]"></i> 현재위치
+                </div>
+            `;
+            
+            if (isSetupMode) {
+                makeElementDraggable(curPin, (newX, newY) => {
+                    appData.currentLocation = { x: newX, y: newY };
+                    saveData();
+                });
+            }
+
+            container.appendChild(curPin);
+
+            const teams = appData.days[currentDay] || [];
+
+            teams.forEach((team, index) => {
+                if (team.x === null || team.y === null) return;
+
+                const pin = document.createElement('div');
+                const isSelected = activeSelectedBoothId === team.id;
+                const isBubbleOpen = openBubbleBoothId === team.id;
+                const pinBg = getBgColorByColorName(team.color);
+
+                pin.className = `marker flex flex-col items-center group ${isSelected || isBubbleOpen ? 'z-40 scale-105' : ''}`;
+                pin.style.left = `${team.x}%`;
+                pin.style.top = `${team.y}%`;
+
+                let bubbleHtml = '';
+                if (isBubbleOpen && !isSetupMode) {
+                    const descFormatted = escapeHtml(team.desc || '등록된 정보가 없습니다.').replace(/\n/g, '<br>');
+                    bubbleHtml = `
+                        <div class="speech-bubble" onclick="event.stopPropagation()">
+                            <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-700/80">
+                                <span class="text-[11px] font-black text-amber-400">부스 #${index + 1}</span>
+                                <button onclick="closeActiveBubble()" class="text-slate-400 hover:text-white text-xs">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <h4 class="font-bold text-xs text-slate-100 mb-1 leading-snug">${escapeHtml(team.name)}</h4>
+                            <div class="text-[11px] text-slate-300 leading-relaxed font-normal">${descFormatted}</div>
+                        </div>
+                    `;
+                }
+
+                pin.innerHTML = `
+                    ${bubbleHtml}
+                    <div class="w-8 h-8 rounded-full ${pinBg} font-black text-xs flex items-center justify-center border-2 border-white shadow-xl group-hover:scale-110 transition-transform">
+                        ${index + 1}
+                    </div>
+                    <div class="mt-1 bg-slate-900/90 backdrop-blur text-slate-100 text-[11px] font-bold px-2 py-0.5 rounded-md shadow-md border border-slate-700/80 max-w-[120px] truncate text-center">
+                        ${escapeHtml(team.name)}
+                    </div>
+                `;
+
+                pin.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isSetupMode) {
+                        openBoothEditModal(team.id);
+                    } else {
+                        toggleSpeechBubble(team.id, e);
+                    }
+                };
+
+                if (isSetupMode) {
+                    makeElementDraggable(pin, (newX, newY) => {
+                        team.x = newX;
+                        team.y = newY;
+                        saveData();
+                    });
+                }
+
+                container.appendChild(pin);
+            });
+        }
+
+        const mapWrapper = document.getElementById('map-wrapper');
+        mapWrapper.addEventListener('click', (e) => {
+            if (!isSetupMode) {
+                closeActiveBubble();
+                return;
+            }
+
+            const rect = mapWrapper.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            const xPercent = Math.round((clickX / rect.width) * 10000) / 100;
+            const yPercent = Math.round((clickY / rect.height) * 10000) / 100;
+
+            if (activeSelectedBoothId === 'CURRENT_LOCATION') {
+                appData.currentLocation = { x: xPercent, y: yPercent };
+                activeSelectedBoothId = null;
+                saveData();
+                updatePlacementToolbar();
+            } else if (activeSelectedBoothId) {
+                const team = appData.days[currentDay].find(t => t.id === activeSelectedBoothId);
+                if (team) {
+                    team.x = xPercent;
+                    team.y = yPercent;
+                }
+                activeSelectedBoothId = null;
+                saveData();
+                updatePlacementToolbar();
+            } else {
+                openBoothEditModal(null, xPercent, yPercent);
+            }
+        });
+
+        function openBoothEditModal(boothId = null, x = null, y = null) {
+            const modal = document.getElementById('booth-edit-modal');
+            const card = document.getElementById('booth-edit-card');
+            const nameInput = document.getElementById('modal-edit-name');
+            const descInput = document.getElementById('modal-edit-desc');
+            const deleteBtn = document.getElementById('modal-delete-btn');
+
+            document.getElementById('modal-edit-id').value = boothId || '';
+            document.getElementById('modal-edit-x').value = x !== null ? x : '';
+            document.getElementById('modal-edit-y').value = y !== null ? y : '';
+
+            if (boothId) {
+                const team = appData.days[currentDay].find(t => t.id === boothId);
+                if (team) {
+                    nameInput.value = team.name;
+                    descInput.value = team.desc || '';
+                    const radio = document.querySelector(`input[name="pin-color"][value="${team.color || 'amber'}"]`);
+                    if (radio) radio.checked = true;
+                }
+                deleteBtn.classList.remove('hidden');
+            } else {
+                const count = (appData.days[currentDay] || []).length + 1;
+                nameInput.value = `부스 ${count}`;
+                descInput.value = '';
+                document.querySelector('input[name="pin-color"][value="amber"]').checked = true;
+                deleteBtn.classList.add('hidden');
+            }
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            card.classList.remove('scale-95');
+            card.classList.add('scale-100');
+            setTimeout(() => nameInput.focus(), 100);
+        }
+
+        function closeBoothEditModal() {
+            const modal = document.getElementById('booth-edit-modal');
+            const card = document.getElementById('booth-edit-card');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            card.classList.remove('scale-100');
+            card.classList.add('scale-95');
+        }
+
+        function saveBoothFromModal(e) {
+            e.preventDefault();
+            const boothId = document.getElementById('modal-edit-id').value;
+            const x = document.getElementById('modal-edit-x').value;
+            const y = document.getElementById('modal-edit-y').value;
+            const name = document.getElementById('modal-edit-name').value;
+            const desc = document.getElementById('modal-edit-desc').value;
+            const color = document.querySelector('input[name="pin-color"]:checked').value;
+
+            const teams = appData.days[currentDay];
+
+            if (boothId) {
+                const team = teams.find(t => t.id === boothId);
+                if (team) {
+                    team.name = name;
+                    team.desc = desc;
+                    team.color = color;
+                }
+            } else {
+                teams.push({
+                    id: `b${currentDay}_${Date.now()}`,
+                    name: name,
+                    desc: desc,
+                    color: color,
+                    x: parseFloat(x),
+                    y: parseFloat(y)
+                });
+            }
+
+            closeBoothEditModal();
+            saveData();
+        }
+
+        function deleteBoothFromModal() {
+            const boothId = document.getElementById('modal-edit-id').value;
+            if (!boothId) return;
+
+            if (confirm('해당 부스를 마킹과 명단에서 삭제하시겠습니까?')) {
+                appData.days[currentDay] = appData.days[currentDay].filter(t => t.id !== boothId);
+                closeBoothEditModal();
+                saveData();
+            }
+        }
+
+        function makeElementDraggable(elmnt, onDragEnd) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            elmnt.onmousedown = dragMouseDown;
+            elmnt.ontouchstart = dragMouseDown;
+
+            function dragMouseDown(e) {
+                if (!isSetupMode) return;
+                e.stopPropagation();
+                
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                pos3 = clientX;
+                pos4 = clientY;
+
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+                document.ontouchend = closeDragElement;
+                document.ontouchmove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e.preventDefault();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                pos1 = pos3 - clientX;
+                pos2 = pos4 - clientY;
+                pos3 = clientX;
+                pos4 = clientY;
+
+                const parentRect = mapWrapper.getBoundingClientRect();
+                let newLeft = elmnt.offsetLeft - pos1;
+                let newTop = elmnt.offsetTop - pos2;
+
+                let xPct = Math.min(Math.max((newLeft / parentRect.width) * 100, 2), 98);
+                let yPct = Math.min(Math.max((newTop / parentRect.height) * 100, 2), 98);
+
+                elmnt.style.left = xPct + "%";
+                elmnt.style.top = yPct + "%";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+                document.ontouchend = null;
+                document.ontouchmove = null;
+
+                const xPct = parseFloat(elmnt.style.left);
+                const yPct = parseFloat(elmnt.style.top);
+                onDragEnd(Math.round(xPct * 100) / 100, Math.round(yPct * 100) / 100);
+            }
+        }
+
+        let zoomLevel = 1;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let startX, startY;
+
+        const viewport = document.getElementById('map-viewport');
+        const wrapper = document.getElementById('map-wrapper');
+
+        function updateTransform() {
+            wrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+        }
+
+        function zoomIn() {
+            zoomLevel = Math.min(zoomLevel + 0.2, 2.5);
+            updateTransform();
+        }
+
+        function zoomOut() {
+            zoomLevel = Math.max(zoomLevel - 0.2, 0.7);
+            updateTransform();
+        }
+
+        function resetZoom() {
+            zoomLevel = 1;
+            panX = 0;
+            panY = 0;
+            wrapper.style.transition = 'transform 0.25s ease-out';
+            updateTransform();
+            
+            setTimeout(() => {
+                wrapper.style.transition = 'transform 75ms ease-out';
+            }, 250);
+        }
+
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.marker')) return;
+            isPanning = true;
+            startX = e.clientX - panX;
+            startY = e.clientY - panY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            panX = e.clientX - startX;
+            panY = e.clientY - startY;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            isPanning = false;
+        });
+
+        viewport.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1 && !e.target.closest('.marker')) {
+                isPanning = true;
+                startX = e.touches[0].clientX - panX;
+                startY = e.touches[0].clientY - panY;
+            }
+        });
+
+        viewport.addEventListener('touchmove', (e) => {
+            if (isPanning && e.touches.length === 1) {
+                panX = e.touches[0].clientX - startX;
+                panY = e.touches[0].clientY - startY;
+                updateTransform();
+            }
+        });
+
+        viewport.addEventListener('touchend', () => {
+            isPanning = false;
+        });
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
