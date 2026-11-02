@@ -237,16 +237,11 @@
                     
                     <!-- Base Canvas Image -->
                     <svg id="base-svg-map" class="w-full h-auto max-h-[85vh] rounded-xl shadow-2xl select-none block" viewBox="0 0 1000 700" style="min-width: 600px; background: #ffffff;">
-                        <!-- SVG Map Layout matching event map artwork -->
                         <rect width="1000" height="700" fill="#FFFFFF"/>
-                        
-                        <!-- Top Banner / Title Header Artwork -->
                         <text x="500" y="45" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="700" font-size="20" fill="#1e293b">게릴라 야~호! 부스 야~호!</text>
                         <text x="500" y="85" text-anchor="middle" font-family="Pretendard, sans-serif" font-weight="900" font-size="34" fill="#09090b">너의 도전에 응원 스티커 전송 완료 💖</text>
                         
-                        <!-- Top TV Display Ribbon Line -->
                         <rect x="90" y="140" width="820" height="28" fill="#bfdbfe" rx="4"/>
-                        <!-- Top TVs -->
                         <g transform="translate(100, 125)">
                             <rect x="0" y="0" width="55" height="40" rx="8" fill="none" stroke="#1e293b" stroke-width="4.5"/>
                             <line x1="20" y1="-10" x2="27" y2="0" stroke="#1e293b" stroke-width="3"/>
@@ -276,14 +271,12 @@
                             <circle cx="43" cy="24" r="2.5" fill="#1e293b"/>
                         </g>
 
-                        <!-- Curving Booth Area Shapes -->
                         <path d="M 200,430 A 130,130 0 1,0 140,580" fill="none" stroke="#38bdf8" stroke-width="46" stroke-linecap="round"/>
                         <path d="M 300,410 A 110,110 0 0,1 500,420" fill="none" stroke="#fbbf24" stroke-width="42" stroke-linecap="round"/>
                         <path d="M 490,420 A 90,90 0 0,1 660,430" fill="none" stroke="#fbbf24" stroke-width="38" stroke-linecap="round"/>
                         <path d="M 800,420 A 130,130 0 1,1 860,580" fill="none" stroke="#38bdf8" stroke-width="46" stroke-linecap="round"/>
                         <path d="M 320,590 A 90,90 0 0,0 480,590" fill="none" stroke="#78350f" stroke-width="38" stroke-linecap="round"/>
 
-                        <!-- Decorative Labels -->
                         <text x="135" y="495" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#0369a1" text-anchor="middle">A 존</text>
                         <text x="400" y="340" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#b45309" text-anchor="middle">B 존</text>
                         <text x="580" y="360" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#b45309" text-anchor="middle">C 존</text>
@@ -291,17 +284,11 @@
                         <text x="400" y="655" font-family="Pretendard, sans-serif" font-weight="700" font-size="14" fill="#451a03" text-anchor="middle">E 존</text>
                     </svg>
 
-                    <!-- Interactive Pin Overlay Container -->
-                    <div id="pins-layer" class="absolute inset-0 w-full h-full pointer-events-auto">
-                        <!-- Pins generated dynamically -->
-                    </div>
-
-                    <!-- Setup Grid Overlay -->
+                    <div id="pins-layer" class="absolute inset-0 w-full h-full pointer-events-auto"></div>
                     <div id="grid-overlay" class="absolute inset-0 grid-overlay pointer-events-none hidden opacity-60"></div>
                 </div>
             </div>
 
-            <!-- Setup Placement Floating Status Bar -->
             <div id="placement-toolbar" class="absolute bottom-6 bg-slate-800/95 text-white border border-slate-700 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 z-30 transition-all transform translate-y-24 opacity-0 pointer-events-none">
                 <div class="flex items-center gap-2">
                     <span class="w-3 h-3 rounded-full bg-amber-400 animate-ping"></span>
@@ -314,7 +301,7 @@
         </main>
     </div>
 
-    <!-- Modal: Direct Click Add/Edit Booth Marker (Setup Mode Only) -->
+    <!-- Modal: Direct Click Add/Edit Booth Marker -->
     <div id="booth-edit-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
         <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl transform scale-95 transition-transform duration-200" id="booth-edit-card">
             <div class="flex justify-between items-start mb-4">
@@ -373,20 +360,16 @@
 
     <!-- Application JavaScript Logic -->
     <script>
-        // Security Settings
         const ADMIN_PASSWORD = "1234"; 
 
-        // 구글 스프레드시트 CSV 게시 URL (전달주신 ID 연동)
         const SPREADSHEET_ID = "1gid3GMoo1hNpS7fWX23sumPqwO36ikB1JZRAdmJerKA";
         const GOOGLE_CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
 
-        // State Management
         let currentDay = 1;
         let isSetupMode = false;
         let activeSelectedBoothId = null;
         let openBubbleBoothId = null;
 
-        // 지도의 기본 핀 위치 좌표 템플릿 (12개~13개 부스에 순차 적용)
         const defaultCoordinates = [
             { x: 18, y: 55 }, { x: 14, y: 72 }, { x: 26, y: 78 }, { x: 33, y: 52 },
             { x: 40, y: 56 }, { x: 47, y: 54 }, { x: 54, y: 56 }, { x: 62, y: 58 },
@@ -400,29 +383,31 @@
             currentLocation: { ...currentLocationPin }
         };
 
-        // CSV 데이터 파싱 함수
+        // CSV 라인 분석 함수
         function parseCSV(text) {
             const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
             const result = [];
             
             for (let i = 1; i < lines.length; i++) {
-                // 큰따옴표 포함 CSV 정규식 분어
                 const matches = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
                 const cols = matches.map(c => c.replace(/^"|"$/g, '').trim());
-                if (cols.length >= 3) {
+                
+                // 새로운 시트 컬럼 순서 매핑:
+                // cols[0]: 일자, cols[1]: 학년, cols[2]: 부스번호, cols[3]: 부스명, cols[4]: 운영자, cols[5]: 한줄소개
+                if (cols.length >= 4) {
                     result.push({
                         day: parseInt(cols[0]) || 1,
-                        grade: cols[1],
-                        name: cols[2] || '',
-                        operator: cols[3] || '',
-                        intro: cols[4] || ''
+                        grade: cols[1] || '',
+                        boothNo: parseInt(cols[2]) || null,
+                        name: cols[3] || '',
+                        operator: cols[4] || '',
+                        intro: cols[5] || ''
                     });
                 }
             }
             return result;
         }
 
-        // 구글 스프레드시트 데이터 연동
         async function fetchGoogleSheetData() {
             try {
                 const response = await fetch(GOOGLE_CSV_URL);
@@ -438,21 +423,22 @@
                         const existingList = newDays[dayNum];
                         const idx = existingList.length;
 
-                        // 학년에 따른 마커 색상 매핑 (1학년: amber(노랑), 2학년: sky(파랑), 기타: rose(핑크))
+                        // 학년에 따른 마커 색상 (1학년: amber/노랑, 2학년: sky/파랑, 기타: rose/핑크)
                         let color = 'amber';
                         if (row.grade.includes('2')) color = 'sky';
                         else if (row.grade.includes('이벤트') || row.grade.includes('3')) color = 'rose';
 
-                        // 설명 문구 생성 (운영자 + 한줄소개 조합)
                         let descText = '';
                         if (row.operator) descText += `운영자: ${row.operator}`;
                         if (row.intro) descText += (descText ? '\n' : '') + row.intro;
 
-                        const coord = defaultCoordinates[idx % defaultCoordinates.length];
+                        // 부스 번호가 등록되어 있으면 해당 번호 위치의 좌표 사용, 없으면 순서대로 배치
+                        const posIndex = (row.boothNo && row.boothNo > 0) ? (row.boothNo - 1) : idx;
+                        const coord = defaultCoordinates[posIndex % defaultCoordinates.length];
 
                         existingList.push({
-                            id: `b${dayNum}_${idx + 1}`,
-                            name: row.name || `부스 #${idx + 1}`,
+                            id: `b${dayNum}_${row.boothNo || (idx + 1)}`,
+                            name: row.name || (row.boothNo ? `부스 #${row.boothNo}` : `부스 #${idx + 1}`),
                             desc: descText,
                             color: color,
                             x: coord.x,
@@ -464,12 +450,12 @@
                     saveData();
                 }
             } catch (err) {
-                console.warn('구글 시트 로드 중 오류 발생, 로컬 저장 데이터를 사용합니다.', err);
+                console.warn('구글 시트 로드 실패, 저장된 데이터를 유지합니다.', err);
             }
         }
 
         function loadData() {
-            const saved = localStorage.getItem('booth_app_data_v5');
+            const saved = localStorage.getItem('booth_app_data_v6');
             if (saved) {
                 try {
                     appData = JSON.parse(saved);
@@ -480,7 +466,7 @@
         }
 
         function saveData() {
-            localStorage.setItem('booth_app_data_v5', JSON.stringify(appData));
+            localStorage.setItem('booth_app_data_v6', JSON.stringify(appData));
             renderSidebar();
             renderPins();
         }
@@ -578,7 +564,6 @@
 
             let placedCount = 0;
 
-            // Current Location Pin Settings Item
             const curLocItem = document.createElement('div');
             curLocItem.className = `p-2.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
                 activeSelectedBoothId === 'CURRENT_LOCATION' 
@@ -784,7 +769,6 @@
                 pin.style.left = `${team.x}%`;
                 pin.style.top = `${team.y}%`;
 
-                // Speech Bubble Overlay content
                 let bubbleHtml = '';
                 if (isBubbleOpen && !isSetupMode) {
                     const descFormatted = escapeHtml(team.desc || '등록된 정보가 없습니다.').replace(/\n/g, '<br>');
@@ -833,7 +817,6 @@
             });
         }
 
-        // Map Click Event: Direct Click Location & Record Booth Info
         const mapWrapper = document.getElementById('map-wrapper');
         mapWrapper.addEventListener('click', (e) => {
             if (!isSetupMode) {
@@ -867,7 +850,6 @@
             }
         });
 
-        // Open Modal to Add/Edit Booth
         function openBoothEditModal(boothId = null, x = null, y = null) {
             const modal = document.getElementById('booth-edit-modal');
             const card = document.getElementById('booth-edit-card');
@@ -1008,7 +990,6 @@
             }
         }
 
-        // Zoom & Pan Controller Logic
         let zoomLevel = 1;
         let panX = 0;
         let panY = 0;
