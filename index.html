@@ -369,11 +369,14 @@
 
     <!-- Application JavaScript Logic -->
     <script>
+        // Security Settings
+        const ADMIN_PASSWORD = "1234"; // 관리자 모드 접속 비밀번호 (필요 시 수정 가능)
+
         // State Management
         let currentDay = 1;
         let isSetupMode = false;
         let activeSelectedBoothId = null;
-        let openBubbleBoothId = null; // Currently open speech bubble ID in guidance mode
+        let openBubbleBoothId = null;
 
         // Default Data for 3 Days (12 booths on Day 1 & 2, 13 booths on Day 3)
         const initialDaysData = {
@@ -476,6 +479,17 @@
         }
 
         function toggleMode() {
+            // 관리자 모드로 전환하려는 경우 비밀번호 확인
+            if (!isSetupMode) {
+                const inputPassword = prompt("관리자 설정 모드로 전환하려면 비밀번호를 입력하세요:");
+                if (inputPassword === null) return; // 취소 버튼을 누른 경우
+                
+                if (inputPassword !== ADMIN_PASSWORD) {
+                    alert("비밀번호가 올바르지 않습니다.");
+                    return;
+                }
+            }
+
             isSetupMode = !isSetupMode;
             activeSelectedBoothId = null;
             openBubbleBoothId = null;
@@ -720,11 +734,11 @@
 
             container.appendChild(curPin);
 
-            // 2. Booth Pins (Only renders placed booths; 12 or 13 depending on day data)
+            // 2. Booth Pins (Only renders placed booths)
             const teams = appData.days[currentDay] || [];
 
             teams.forEach((team, index) => {
-                if (team.x === null || team.y === null) return; // 13th booth naturally hidden if unplaced or non-existent
+                if (team.x === null || team.y === null) return;
 
                 const pin = document.createElement('div');
                 const isSelected = activeSelectedBoothId === team.id;
