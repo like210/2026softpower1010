@@ -342,8 +342,8 @@
     <script>
         const ADMIN_PASSWORD = "1234"; 
 
-        // ⚠️ 아래 큰따옴표 안에 생성하신 Apps Script 웹 앱 URL을 넣으세요!
-        const GAS_WEB_APP_URL = "https://script.googleusercontent.com/a/macros/on.use.go.kr/echo?user_content_key=AUkAhnSXxvNvXO5KBSc9JGbTLBjqtN111uu4GKY1G6Yj-nGCH8s7Xt_8A6l9h_EK5hWa1giuei2aRXD3nJKdP0OPL6DlEBk2QQFvBzWA7Mopo4bYEHyjka2a1zlaKrtdZjHVOuxRrf_9huiF3pzQGznT7iZsv2MkpEqkCXpkd7xDKLxAI6x4Qk2tCnVTizmPxoSI8tsLEps0FCYCjqGuLrphlVjHS6twq_va4HlYLoj_dS8Dnf13H1JJ7ae2-OTouaXxmCodcgYgxNhwEDrJ5uh3cSuIkw1nybFweyBEqKFK&lib=MLN6mVCshY2-n1wPjg0a426-NPiLuMcbZ";
+        // 지정해주신 배포 URL이 적용되었습니다.
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyWq8RNE1Zir20uPoUrhYME7qJkbSeH8keblavS6ih3jwt5cYE1T30FA9kC0ENYPsE/exec";
 
         let currentDay = 1;
         let isSetupMode = false;
@@ -366,39 +366,48 @@
         // Apps Script JSON API 동기화 함수
         async function fetchGoogleSheetData() {
             if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_SCRIPT_ID_HERE")) {
-                console.warn("Apps Script 웹 앱 URL을 등록해주세요.");
+                console.warn("Apps Script 웹 앱 URL이 등록되지 않았습니다.");
                 return;
             }
 
             try {
-                const response = await fetch(GAS_WEB_APP_URL);
-                if (!response.ok) throw new Error('API 응답 실패');
+                // Apps Script 302 리다이렉트 응답을 따라가도록 설정
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: "GET",
+                    redirect: "follow"
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 
                 const rows = await response.json();
 
                 if (Array.isArray(rows) && rows.length > 0) {
                     const newDays = { 1: [], 2: [], 3: [] };
 
-                    rows.forEach((row, idx) => {
-                        const dayNum = [1, 2, 3].includes(row.day) ? row.day : 1;
+                    rows.forEach((row) => {
+                        const dayNum = [1, 2, 3].includes(Number(row.day)) ? Number(row.day) : 1;
                         const existingList = newDays[dayNum];
 
                         // 학년 색상 매핑 (1학년: amber, 2학년: sky, 기타: rose)
                         let color = 'amber';
-                        if (String(row.grade).includes('2')) color = 'sky';
-                        else if (String(row.grade).includes('이벤트') || String(row.grade).includes('3')) color = 'rose';
+                        const gradeStr = String(row.grade || '');
+                        if (gradeStr.includes('2')) color = 'sky';
+                        else if (gradeStr.includes('이벤트') || gradeStr.includes('3')) color = 'rose';
 
                         let descText = '';
                         if (row.operator) descText += `운영자: ${row.operator}`;
                         if (row.intro) descText += (descText ? '\n' : '') + row.intro;
 
-                        const posIndex = (row.boothNo && row.boothNo > 0) ? (row.boothNo - 1) : existingList.length;
+                        const boothNum = row.boothNo ? Number(row.boothNo) : null;
+                        const posIndex = (boothNum && boothNum > 0) ? (boothNum - 1) : existingList.length;
                         const coord = defaultCoordinates[posIndex % defaultCoordinates.length];
 
-                        const displayName = row.name || (row.boothNo ? `부스 #${row.boothNo}` : `부스 #${existingList.length + 1}`);
+                        const displayName = row.name || (boothNum ? `부스 #${boothNum}` : `부스 #${existingList.length + 1}`);
 
                         existingList.push({
-                            id: `b${dayNum}_${row.boothNo || (existingList.length + 1)}`,
+                            id: `b${dayNum}_${boothNum || (existingList.length + 1)}`,
                             name: displayName,
                             desc: descText,
                             color: color,
@@ -409,7 +418,7 @@
 
                     appData.days = newDays;
                     saveData();
-                    console.log('Apps Script를 통한 구글 시트 동기화 완료!');
+                    console.log('✅ Apps Script를 통한 구글 시트 동기화 완료!');
                 }
             } catch (err) {
                 console.error('구글 시트 Apps Script 로드 실패:', err);
