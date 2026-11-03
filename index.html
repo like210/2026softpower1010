@@ -187,7 +187,7 @@
 
             <div class="p-2 text-xs bg-amber-950/40 text-amber-300 border-b border-amber-900/30 flex items-center gap-1.5 px-3">
                 <i class="fa-solid fa-circle-info text-amber-400"></i>
-                <span>지도의 원하는 위치를 직접 클릭하여 마킹을 생성 및 등록하세요!</span>
+                <span>지도의 마커를 드래그하거나 위치를 클릭하면 시트에 자동 저장됩니다!</span>
             </div>
 
             <div class="flex-1 overflow-y-auto p-3 space-y-2.5" id="team-list-container"></div>
@@ -195,7 +195,7 @@
             <div class="p-3 border-t border-slate-700 bg-slate-850 flex justify-between items-center text-xs text-slate-400">
                 <span>등록된 부스: <strong id="placed-count" class="text-amber-400">0</strong>개</span>
                 <button onclick="toggleMode()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition">
-                    설정 완료 & Save
+                    설정 완료 & 나가기
                 </button>
             </div>
         </aside>
@@ -342,7 +342,7 @@
     <script>
         const ADMIN_PASSWORD = "1234"; 
 
-        // 지정해주신 배포 URL이 적용되었습니다.
+        // 배포 URL 적용
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyWq8RNE1Zir20uPoUrhYME7qJkbSeH8keblavS6ih3jwt5cYE1T30FA9kC0ENYPsE/exec";
 
         let currentDay = 1;
@@ -371,26 +371,26 @@
             }
 
             try {
-                // Apps Script 302 리다이렉트 응답을 따라가도록 설정
                 const response = await fetch(GAS_WEB_APP_URL, {
                     method: "GET",
                     redirect: "follow"
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 
                 const rows = await response.json();
 
                 if (Array.isArray(rows) && rows.length > 0) {
                     const newDays = { 1: [], 2: [], 3: [] };
 
-                    rows.forEach((row) => {
+                    rows.forEach((row, idx) => {
                         const dayNum = [1, 2, 3].includes(Number(row.day)) ? Number(row.day) : 1;
                         const existingList = newDays[dayNum];
 
-                        // 학년 색상 매핑 (1학년: amber, 2학년: sky, 기타: rose)
+                        const boothNum = row.boothNo ? Number(row.boothNo) : null;
+                        const boothId = `b${dayNum}_${boothNum || (idx + 1)}`;
+                        const displayName = row.name || (boothNum ? `부스 #${boothNum}` : `부스 #${existingList.length + 1}`);
+
                         let color = 'amber';
                         const gradeStr = String(row.grade || '');
                         if (gradeStr.includes('2')) color = 'sky';
@@ -400,33 +400,42 @@
                         if (row.operator) descText += `운영자: ${row.operator}`;
                         if (row.intro) descText += (descText ? '\n' : '') + row.intro;
 
-                        const boothNum = row.boothNo ? Number(row.boothNo) : null;
-                        const posIndex = (boothNum && boothNum > 0) ? (boothNum - 1) : existingList.length;
-                        const coord = defaultCoordinates[posIndex % defaultCoordinates.length];
+                        // 💡 구글 시트 G열(x), H열(y)에 등록된 좌표가 있으면 최우선 반영
+                        let finalX = (row.x !== null && row.x !== undefined && !isNaN(row.x)) ? Number(row.x) : null;
+                        let finalY = (row.y !== null && row.y !== undefined && !isNaN(row.y)) ? Number(row.y) : null;
 
-                        const displayName = row.name || (boothNum ? `부스 #${boothNum}` : `부스 #${existingList.length + 1}`);
+                        // 시트에도 좌표가 비어있다면 부스 번호 기준 기본 좌표 배치
+                        if (finalX === null || finalY === null) {
+                            const posIndex = (boothNum && boothNum > 0) ? (boothNum - 1) : existingList.length;
+                            const coord = defaultCoordinates[posIndex % defaultCoordinates.length];
+                            finalX = coord.x;
+                            finalY = coord.y;
+                        }
 
                         existingList.push({
-                            id: `b${dayNum}_${boothNum || (existingList.length + 1)}`,
+                            id: boothId,
+                            boothNo: boothNum,
                             name: displayName,
                             desc: descText,
                             color: color,
-                            x: coord.x,
-                            y: coord.y
+                            x: finalX,
+                            y: finalY
                         });
                     });
 
                     appData.days = newDays;
-                    saveData();
-                    console.log('✅ Apps Script를 통한 구글 시트 동기화 완료!');
+                    localStorage.setItem('booth_app_data_v8', JSON.stringify(appData));
+                    renderSidebar();
+                    renderPins();
+                    console.log('✅ 중앙 시트 좌표 동기화 완료!');
                 }
             } catch (err) {
-                console.error('구글 시트 Apps Script 로드 실패:', err);
+                console.error('구글 시트 로드 실패:', err);
             }
         }
 
         function loadData() {
-            const saved = localStorage.getItem('booth_app_data_v7');
+            const saved = localStorage.getItem('booth_app_data_v8');
             if (saved) {
                 try {
                     appData = JSON.parse(saved);
@@ -436,10 +445,50 @@
             }
         }
 
+        // 디바운스 타이머 (드래그 시 잦은 API 호출 방지)
+        let syncDebounceTimer = null;
+
         function saveData() {
-            localStorage.setItem('booth_app_data_v7', JSON.stringify(appData));
+            localStorage.setItem('booth_app_data_v8', JSON.stringify(appData));
             renderSidebar();
             renderPins();
+
+            // 관리자가 위치를 변경했을 때만 구글 스프레드시트에 영구 저장
+            if (isSetupMode) {
+                clearTimeout(syncDebounceTimer);
+                syncDebounceTimer = setTimeout(async () => {
+                    const coordinatesPayload = [];
+                    
+                    [1, 2, 3].forEach(d => {
+                        (appData.days[d] || []).forEach(booth => {
+                            if (booth.x !== null && booth.y !== null) {
+                                coordinatesPayload.push({
+                                    day: d,
+                                    boothNo: booth.boothNo,
+                                    name: booth.name,
+                                    x: booth.x,
+                                    y: booth.y
+                                });
+                            }
+                        });
+                    });
+
+                    try {
+                        await fetch(GAS_WEB_APP_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'updateCoordinates',
+                                coordinates: coordinatesPayload
+                            })
+                        });
+                        console.log('☁️ 구글 스프레드시트(G, H열)에 수정된 좌표가 영구 반영되었습니다.');
+                    } catch (e) {
+                        console.warn('시트 좌표 저장 실패:', e);
+                    }
+                }, 800);
+            }
         }
 
         window.addEventListener('load', async () => {
@@ -579,7 +628,7 @@
                 item.innerHTML = `
                     <div class="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onclick="openBoothEditModal('${team.id}')">
                         <span class="w-6 h-6 rounded-lg ${getBgColorByColorName(team.color)} text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
-                            ${index + 1}
+                            ${team.boothNo || (index + 1)}
                         </span>
                         <div class="flex flex-col truncate">
                             <span class="text-xs text-slate-100 font-bold truncate">${escapeHtml(team.name)}</span>
@@ -619,6 +668,7 @@
             const newId = `b${currentDay}_${Date.now()}`;
             teams.push({
                 id: newId,
+                boothNo: teams.length + 1,
                 name: `신규 부스 #${teams.length + 1}`,
                 desc: '운영자 명단 및 한줄소개',
                 color: 'amber',
@@ -643,6 +693,7 @@
                 } else {
                     currentTeams.push({
                         id: `b${currentDay}_${Date.now()}_${idx}`,
+                        boothNo: idx + 1,
                         name: line,
                         desc: '운영 명단 및 안내',
                         color: 'amber',
@@ -744,7 +795,7 @@
                     bubbleHtml = `
                         <div class="speech-bubble" onclick="event.stopPropagation()">
                             <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-700/80">
-                                <span class="text-[11px] font-black text-amber-400">부스 #${index + 1}</span>
+                                <span class="text-[11px] font-black text-amber-400">부스 #${team.boothNo || (index + 1)}</span>
                                 <button onclick="closeActiveBubble()" class="text-slate-400 hover:text-white text-xs">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
@@ -758,7 +809,7 @@
                 pin.innerHTML = `
                     ${bubbleHtml}
                     <div class="w-8 h-8 rounded-full ${pinBg} font-black text-xs flex items-center justify-center border-2 border-white shadow-xl group-hover:scale-110 transition-transform">
-                        ${index + 1}
+                        ${team.boothNo || (index + 1)}
                     </div>
                     <div class="mt-1 bg-slate-900/90 backdrop-blur text-slate-100 text-[11px] font-bold px-2 py-0.5 rounded-md shadow-md border border-slate-700/80 max-w-[120px] truncate text-center">
                         ${escapeHtml(team.name)}
@@ -882,6 +933,7 @@
             } else {
                 teams.push({
                     id: `b${currentDay}_${Date.now()}`,
+                    boothNo: teams.length + 1,
                     name: name,
                     desc: desc,
                     color: color,
